@@ -1,0 +1,786 @@
+[
+  {
+    "id": "prod_00000",
+    "name": "চাল",
+    "category": "খাদ্যশস্য",
+    "description": "সাদা চাল, স্থানীয় উৎপাদিত, ১ কেজি প্যাকেজ",
+    "price_taka": 45
+  },
+  {
+    "id": "prod_00001",
+    "name": "গম",
+    "category": "খাদ্যশস্য",
+    "description": "সাদা গম, উচ্চমানের, ৫ কেজি ব্যাগ",
+    "price_taka": 200
+  },
+  {
+    "id": "prod_00002",
+    "name": "ডাল",
+    "category": "দালিল শস্য",
+    "description": "মসুর ডাল, নিরাপদ এবং তাজা, ১ কেজি",
+    "price_taka": 120
+  },
+  {
+    "id": "prod_00003",
+    "name": "সয়াবিন তেল",
+    "category": "রান্নার তেল",
+    "description": "বিশুদ্ধ সয়াবিন তেল, ১ লিটার বোতল",
+    "price_taka": 280
+  },
+  {
+    "id": "prod_00004",
+    "name": "সরিষার তেল",
+    "category": "রান্নার তেল",
+    "description": "ঐতিহ্যবাহী সরিষার তেল, ৫০০ মিলি",
+    "price_taka": 150
+  },
+  {
+    "id": "prod_00005",
+    "name": "চিনি",
+    "category": "মিষ্টি",
+    "description": "সাদা পরিশোধিত চিনি, ১ কেজি",
+    "price_taka": 80
+  },
+  {
+    "id": "prod_00006",
+    "name": "লবণ",
+    "category": "মশলা",
+    "description": "সমুদ্রের লবণ, ১ কেজি",
+    "price_taka": 40
+  },
+  {
+    "id": "prod_00007",
+    "name": "নুডুলস",
+    "category": "তাৎক্ষণিক খাদ্য",
+    "description": "ডিম নুডুলস, ৫০০ গ্রাম প্যাকেজ",
+    "price_taka": 60
+  },
+  {
+    "id": "prod_00008",
+    "name": "আটা",
+    "category": "খাদ্যশস্য",
+    "description": "গম আটা, উচ্চমানের, ১ কেজি",
+    "price_taka": 55
+  },
+  {
+    "id": "prod_00009",
+    "name": "বার্লি",
+    "category": "খাদ্যশস্য",
+    "description": "প্রাকৃতিক বার্লি, ১ কেজি",
+    "price_taka": 85
+  },
+  {
+    "id": "prod_00010",
+    "name": "দই",
+    "category": "দুগ্ধজাত",
+    "description": "তাজা গরুর দই, ৫০০ গ্রাম কাপ",
+    "price_taka": 70
+  },
+  {
+    "id": "prod_00011",
+    "name": "পনির",
+    "category": "দুগ্ধজাত",
+    "description": "ঘৃতি পনির, ২০০ গ্রাম ব্লক",
+    "price_taka": 180
+  },
+  {
+    "id": "prod_00012",
+    "name": "ডিম",
+    "category": "প্রোটিন",
+    "description": "তাজা মুরগির ডিম, ডজন প্যাক",
+    "price_taka": 120
+  },
+  {
+    "id": "prod_00013",
+    "name": "মুরগি",
+    "category": "প্রোটিন",
+    "description": "তাজা মুরগির মাংস, ১ কেজি",
+    "price_taka": 400
+  },
+  {
+    "id": "prod_00014",
+    "name": "মাছ",
+    "category": "প্রোটিন",
+    "description": "তাজা রুই মাছ, ১ কেজি",
+    "price_taka": 350
+  },
+  {
+    "id": "prod_00015",
+    "name": "আলু",
+    "category": "শাকসবজি",
+    "description": "স্থানীয় আলু, ১ কেজি",
+    "price_taka": 35
+  },
+  {
+    "id": "prod_00016",
+    "name": "পেঁয়াজ",
+    "category": "শাকসবজি",
+    "description": "তাজা পেঁয়াজ, ১ কেজি",
+    "price_taka": 50
+  },
+  {
+    "id": "prod_00017",
+    "name": "রসুন",
+    "category": "শাকসবজি",
+    "description": "সাদা রসুন, ৫০০ গ্রাম",
+    "price_taka": 80
+  },
+  {
+    "id": "prod_00018",
+    "name": "টমেটো",
+    "category": "শাকসবজি",
+    "description": "পাকা টমেটো, ১ কেজি",
+    "price_taka": 55
+  },
+  {
+    "id": "prod_00019",
+    "name": "শসা",
+    "category": "শাকসবজি",
+    "description": "তাজা শসা, ১ কেজি",
+    "price_taka": 40
+  },
+  {
+    "id": "prod_00020",
+    "name": "গাজর",
+    "category": "শাকসবজি",
+    "description": "হলুদ গাজর, ৫০০ গ্রাম",
+    "price_taka": 35
+  },
+  {
+    "id": "prod_00021",
+    "name": "বাঁধাকপি",
+    "category": "শাকসবজি",
+    "description": "তাজা বাঁধাকপি, ১ কেজি",
+    "price_taka": 30
+  },
+  {
+    "id": "prod_00022",
+    "name": "পালং শাক",
+    "category": "শাকসবজি",
+    "description": "তাজা পালং শাক, ৫০০ গ্রাম",
+    "price_taka": 45
+  },
+  {
+    "id": "prod_00023",
+    "name": "লাউ",
+    "category": "শাকসবজি",
+    "description": "মিষ্টি লাউ, ১ টি",
+    "price_taka": 50
+  },
+  {
+    "id": "prod_00024",
+    "name": "ধান",
+    "category": "খাদ্যশস্য",
+    "description": "সবুজ ধান, ১ কেজি (রান্নার জন্য)",
+    "price_taka": 55
+  },
+  {
+    "id": "prod_00025",
+    "name": "ভুট্টা",
+    "category": "খাদ্যশস্য",
+    "description": "হলুদ ভুট্টা, ১ কেজি",
+    "price_taka": 65
+  },
+  {
+    "id": "prod_00026",
+    "name": "বেসন",
+    "category": "খাদ্যশস্য",
+    "description": "ছোলার বেসন, ১ কেজি",
+    "price_taka": 90
+  },
+  {
+    "id": "prod_00027",
+    "name": "জোয়ার",
+    "category": "খাদ্যশস্য",
+    "description": "জোয়ারের আটা, ১ কেজি",
+    "price_taka": 75
+  },
+  {
+    "id": "prod_00028",
+    "name": "ভীনা",
+    "category": "খাদ্যশস্য",
+    "description": "স্থানীয় ভীনা, ১ কেজি",
+    "price_taka": 95
+  },
+  {
+    "id": "prod_00029",
+    "name": "মশুরডাল",
+    "category": "দালিল শস্য",
+    "description": "লাল মশুরডাল, ১ কেজি",
+    "price_taka": 130
+  },
+  {
+    "id": "prod_00030",
+    "name": "মুগ ডাল",
+    "category": "দালিল শস্য",
+    "description": "সবুজ মুগ ডাল, ১ কেজি",
+    "price_taka": 125
+  },
+  {
+    "id": "prod_00031",
+    "name": "ছোলা",
+    "category": "দালিল শস্য",
+    "description": "ছোট ছোলা, ১ কেজি",
+    "price_taka": 110
+  },
+  {
+    "id": "prod_00032",
+    "name": "চিনাবাদাম",
+    "category": "বাদাম",
+    "description": "সিদ্ধ চিনাবাদাম, ৫০০ গ্রাম",
+    "price_taka": 145
+  },
+  {
+    "id": "prod_00033",
+    "name": "কাজু বাদাম",
+    "category": "বাদাম",
+    "description": "টাটকা কাজু বাদাম, ২৫০ গ্রাম",
+    "price_taka": 280
+  },
+  {
+    "id": "prod_00034",
+    "name": "পেস্তাবাদাম",
+    "category": "বাদাম",
+    "description": "ইরানি পেস্তাবাদাম, ২৫০ গ্রাম",
+    "price_taka": 320
+  },
+  {
+    "id": "prod_00035",
+    "name": "কিসমিস",
+    "category": "শুকনো ফল",
+    "description": "ভারতীয় কিসমিস, ২৫০ গ্রাম",
+    "price_taka": 200
+  },
+  {
+    "id": "prod_00036",
+    "name": "খেজুর",
+    "category": "শুকনো ফল",
+    "description": "মধ্যপূর্বীয় খেজুর, ৫০০ গ্রাম",
+    "price_taka": 280
+  },
+  {
+    "id": "prod_00037",
+    "name": "কালিজিরা চাল",
+    "category": "খাদ্যশস্য",
+    "description": "সুগন্ধী কালিজিরা চাল, ১ কেজি",
+    "price_taka": 85
+  },
+  {
+    "id": "prod_00038",
+    "name": "বাসমতি চাল",
+    "category": "খাদ্যশস্য",
+    "description": "লম্বা বাসমতি চাল, ১ কেজি",
+    "price_taka": 150
+  },
+  {
+    "id": "prod_00039",
+    "name": "মিষ্টি আলু",
+    "category": "শাকসবজি",
+    "description": "কমলা মিষ্টি আলু, ১ কেজি",
+    "price_taka": 60
+  },
+  {
+    "id": "prod_00040",
+    "name": "মাশরুম",
+    "category": "শাকসবজি",
+    "description": "তাজা ঢাকার মাশরুম, ২৫০ গ্রাম",
+    "price_taka": 120
+  },
+  {
+    "id": "prod_00041",
+    "name": "ব্রোকলি",
+    "category": "শাকসবজি",
+    "description": "সবুজ ব্রোকলি, ৫০০ গ্রাম",
+    "price_taka": 90
+  },
+  {
+    "id": "prod_00042",
+    "name": "ফুলকপি",
+    "category": "শাকসবজি",
+    "description": "সাদা ফুলকপি, ১ কেজি",
+    "price_taka": 50
+  },
+  {
+    "id": "prod_00043",
+    "name": "পটল",
+    "category": "শাকসবজি",
+    "description": "তাজা পটল, ৫০০ গ্রাম",
+    "price_taka": 45
+  },
+  {
+    "id": "prod_00044",
+    "name": "ঝিঙ্গা",
+    "category": "শাকসবজি",
+    "description": "সবুজ ঝিঙ্গা, ৫০০ গ্রাম",
+    "price_taka": 40
+  },
+  {
+    "id": "prod_00045",
+    "name": "চিংড়ি",
+    "category": "প্রোটিন",
+    "description": "তাজা চিংড়ি, ১ কেজি",
+    "price_taka": 600
+  },
+  {
+    "id": "prod_00046",
+    "name": "কাঁকড়া",
+    "category": "প্রোটিন",
+    "description": "জীবন্ত কাঁকড়া, ১ কেজি",
+    "price_taka": 550
+  },
+  {
+    "id": "prod_00047",
+    "name": "শার্ক",
+    "category": "প্রোটিন",
+    "description": "তাজা শার্ক, ১ কেজি",
+    "price_taka": 450
+  },
+  {
+    "id": "prod_00048",
+    "name": "সিং মাছ",
+    "category": "প্রোটিন",
+    "description": "স্থানীয় সিং মাছ, ১ কেজি",
+    "price_taka": 380
+  },
+  {
+    "id": "prod_00049",
+    "name": "পাঙ্গাস মাছ",
+    "category": "প্রোটিন",
+    "description": "তাজা পাঙ্গাস মাছ, ১ কেজি",
+    "price_taka": 320
+  },
+  {
+    "id": "prod_00050",
+    "name": "ইলিশ মাছ",
+    "category": "প্রোটিন",
+    "description": "বিখ্যাত ইলিশ মাছ, ১ কেজি",
+    "price_taka": 700
+  },
+  {
+    "id": "prod_00051",
+    "name": "ভ্যাজিটেবল স্টক",
+    "category": "স্টক",
+    "description": "জৈব শাকসবজির স্টক, ১ লিটার",
+    "price_taka": 180
+  },
+  {
+    "id": "prod_00052",
+    "name": "চিকেন স্টক",
+    "category": "স্টক",
+    "description": "তাজা মুরগির হাড় দিয়ে তৈরি স্টক, ১ লিটার",
+    "price_taka": 220
+  },
+  {
+    "id": "prod_00053",
+    "name": "মাংস স্টক",
+    "category": "স্টক",
+    "description": "গরুর মাংস দিয়ে তৈরি স্টক, ১ লিটার",
+    "price_taka": 250
+  },
+  {
+    "id": "prod_00054",
+    "name": "ভিনেগার",
+    "category": "রান্নার উপাদান",
+    "description": "সাদা ভিনেগার, ৫০০ মিলি",
+    "price_taka": 60
+  },
+  {
+    "id": "prod_00055",
+    "name": "সয়া সস",
+    "category": "রান্নার উপাদান",
+    "description": "প্রামাণিক সয়া সস, ৫০০ মিলি",
+    "price_taka": 140
+  },
+  {
+    "id": "prod_00056",
+    "name": "মাসালা",
+    "category": "মশলা",
+    "description": "গরম মাসালা মিশ্রণ, ১০০ গ্রাম",
+    "price_taka": 80
+  },
+  {
+    "id": "prod_00057",
+    "name": "হলুদ গুঁড়া",
+    "category": "মশলা",
+    "description": "খাঁটি হলুদ গুঁড়া, ১০০ গ্রাম",
+    "price_taka": 50
+  },
+  {
+    "id": "prod_00058",
+    "name": "লাল মরিচ",
+    "category": "মশলা",
+    "description": "সূক্ষ্ম লাল মরিচ, ১০০ গ্রাম",
+    "price_taka": 70
+  },
+  {
+    "id": "prod_00059",
+    "name": "কালো জিরা",
+    "category": "মশলা",
+    "description": "খাঁটি কালো জিরা, ৫০ গ্রাম",
+    "price_taka": 45
+  },
+  {
+    "id": "prod_00060",
+    "name": "আজোয়াইন",
+    "category": "মশলা",
+    "description": "আজোয়াইন বীজ, ৫০ গ্রাম",
+    "price_taka": 55
+  },
+  {
+    "id": "prod_00061",
+    "name": "মেথি বীজ",
+    "category": "মশলা",
+    "description": "মেথি বীজ, ৫০ গ্রাম",
+    "price_taka": 50
+  },
+  {
+    "id": "prod_00062",
+    "name": "ধনিয়া",
+    "category": "মশলা",
+    "description": "ধনিয়া গুঁড়া, ১০০ গ্রাম",
+    "price_taka": 60
+  },
+  {
+    "id": "prod_00063",
+    "name": "জিরা",
+    "category": "মশলা",
+    "description": "জিরা বীজ, ১০০ গ্রাম",
+    "price_taka": 80
+  },
+  {
+    "id": "prod_00064",
+    "name": "লবঙ্গ",
+    "category": "মশলা",
+    "description": "খাঁটি লবঙ্গ, ৫০ গ্রাম",
+    "price_taka": 120
+  },
+  {
+    "id": "prod_00065",
+    "name": "এলাচ",
+    "category": "মশলা",
+    "description": "সবুজ এলাচ, ৫০ গ্রাম",
+    "price_taka": 110
+  },
+  {
+    "id": "prod_00066",
+    "name": "দারুচিনি",
+    "category": "মশলা",
+    "description": "দারুচিনির ছাল, ৫০ গ্রাম",
+    "price_taka": 100
+  },
+  {
+    "id": "prod_00067",
+    "name": "তেজপাতা",
+    "category": "মশলা",
+    "description": "তেজপাতা, ২০ গ্রাম",
+    "price_taka": 40
+  },
+  {
+    "id": "prod_00068",
+    "name": "জাফরান",
+    "category": "মশলা",
+    "description": "খাঁটি জাফরান, ১ গ্রাম",
+    "price_taka": 300
+  },
+  {
+    "id": "prod_00069",
+    "name": "রসুন রস",
+    "category": "রান্নার উপাদান",
+    "description": "তরল রসুন রস, ২০০ মিলি",
+    "price_taka": 90
+  },
+  {
+    "id": "prod_00070",
+    "name": "আদা রস",
+    "category": "রান্নার উপাদান",
+    "description": "তাজা আদা রস, ২০০ মিলি",
+    "price_taka": 85
+  },
+  {
+    "id": "prod_00071",
+    "name": "মরিচ পেস্ট",
+    "category": "মশলা",
+    "description": "মরিচ পেস্ট, ২০০ গ্রাম",
+    "price_taka": 95
+  },
+  {
+    "id": "prod_00072",
+    "name": "নারকেল দুধ",
+    "category": "রান্নার উপাদান",
+    "description": "গাঢ় নারকেল দুধ, ২০০ মিলি",
+    "price_taka": 110
+  },
+  {
+    "id": "prod_00073",
+    "name": "নারকেল চিপস",
+    "category": "নারকেল",
+    "description": "কাটা নারকেল চিপস, ২০০ গ্রাম",
+    "price_taka": 100
+  },
+  {
+    "id": "prod_00074",
+    "name": "গুঁড়া চিনি",
+    "category": "মিষ্টি",
+    "description": "সাদা গুঁড়া চিনি, ১ কেজি",
+    "price_taka": 95
+  },
+  {
+    "id": "prod_00075",
+    "name": "ব্রাউন সুগার",
+    "category": "মিষ্টি",
+    "description": "ব্রাউন সুগার, ৫০০ গ্রাম",
+    "price_taka": 110
+  },
+  {
+    "id": "prod_00076",
+    "name": "গুড়",
+    "category": "মিষ্টি",
+    "description": "খাঁটি গুড়, ৫০০ গ্রাম",
+    "price_taka": 120
+  },
+  {
+    "id": "prod_00077",
+    "name": "মধু",
+    "category": "মিষ্টি",
+    "description": "খাঁটি মৌমাছির মধু, ৫০০ গ্রাম",
+    "price_taka": 280
+  },
+  {
+    "id": "prod_00078",
+    "name": "আখের রস",
+    "category": "পানীয়",
+    "description": "তাজা আখের রস প্রোটিন পাউডার সহ, ১ লিটার",
+    "price_taka": 150
+  },
+  {
+    "id": "prod_00079",
+    "name": "নারকেল জল",
+    "category": "পানীয়",
+    "description": "তাজা নারকেল জল, ১ লিটার",
+    "price_taka": 100
+  },
+  {
+    "id": "prod_00080",
+    "name": "লেবুর রস",
+    "category": "পানীয়",
+    "description": "প্রাকৃতিক লেবুর রস, ৫০০ মিলি",
+    "price_taka": 80
+  },
+  {
+    "id": "prod_00081",
+    "name": "ফল জুস",
+    "category": "পানীয়",
+    "description": "মিশ্র ফল জুস, ১ লিটার",
+    "price_taka": 140
+  },
+  {
+    "id": "prod_00082",
+    "name": "চা পাতি",
+    "category": "পানীয়",
+    "description": "সিলেটের বিখ্যাত চা পাতি, ২৫০ গ্রাম",
+    "price_taka": 200
+  },
+  {
+    "id": "prod_00083",
+    "name": "কফি বিন",
+    "category": "পানীয়",
+    "description": "ভাজা কফি বিন, ২৫০ গ্রাম",
+    "price_taka": 250
+  },
+  {
+    "id": "prod_00084",
+    "name": "কফি পাউডার",
+    "category": "পানীয়",
+    "description": "কফি পাউডার, ২০০ গ্রাম",
+    "price_taka": 220
+  },
+  {
+    "id": "prod_00085",
+    "name": "দুধের পাউডার",
+    "category": "দুগ্ধজাত",
+    "description": "সম্পূর্ণ দুধের পাউডার, ৫০০ গ্রাম",
+    "price_taka": 280
+  },
+  {
+    "id": "prod_00086",
+    "name": "দই এনজাইম",
+    "category": "দুগ্ধজাত",
+    "description": "দই তৈরির এনজাইম, ১০ গ্রাম",
+    "price_taka": 150
+  },
+  {
+    "id": "prod_00087",
+    "name": "মাখন",
+    "category": "দুগ্ধজাত",
+    "description": "খাঁটি মাখন, ২০০ গ্রাম",
+    "price_taka": 320
+  },
+  {
+    "id": "prod_00088",
+    "name": "সাওয়া",
+    "category": "দুগ্ধজাত",
+    "description": "গরুর সাওয়া, ২৫০ গ্রাম",
+    "price_taka": 180
+  },
+  {
+    "id": "prod_00089",
+    "name": "ছানা",
+    "category": "দুগ্ধজাত",
+    "description": "তাজা ছানা, ৫০০ গ্রাম",
+    "price_taka": 150
+  },
+  {
+    "id": "prod_00090",
+    "name": "মিষ্টি",
+    "category": "মিষ্টি",
+    "description": "খাঁটি গুলাব জামুন, ২৫০ গ্রাম",
+    "price_taka": 180
+  },
+  {
+    "id": "prod_00091",
+    "name": "রসগোল্লা",
+    "category": "মিষ্টি",
+    "description": "সিলেটি রসগোল্লা, ৪টি",
+    "price_taka": 200
+  },
+  {
+    "id": "prod_00092",
+    "name": "ফিরনি মিশ্রণ",
+    "category": "মিষ্টি",
+    "description": "ফিরনি তৈরির মিশ্রণ, ১০০ গ্রাম",
+    "price_taka": 70
+  },
+  {
+    "id": "prod_00093",
+    "name": "খীর মিশ্রণ",
+    "category": "মিষ্টি",
+    "description": "খীর তৈরির মিশ্রণ, ১০০ গ্রাম",
+    "price_taka": 60
+  },
+  {
+    "id": "prod_00094",
+    "name": "জার্দা খিচুড়ি মিশ্রণ",
+    "category": "মিষ্টি",
+    "description": "জার্দা খিচুড়ি তৈরির মিশ্রণ, ২০০ গ্রাম",
+    "price_taka": 120
+  },
+  {
+    "id": "prod_00095",
+    "name": "বিরিয়ানি মসলা",
+    "category": "মশলা",
+    "description": "বিরিয়ানি মসলা মিশ্রণ, ৫০ গ্রাম",
+    "price_taka": 85
+  },
+  {
+    "id": "prod_00096",
+    "name": "গোলাপি মসলা",
+    "category": "মশলা",
+    "description": "গোলাপি মসলা, ৫০ গ্রাম",
+    "price_taka": 90
+  },
+  {
+    "id": "prod_00097",
+    "name": "তন্দুরি মসলা",
+    "category": "মশলা",
+    "description": "তন্দুরি মসলা, ৫০ গ্রাম",
+    "price_taka": 75
+  },
+  {
+    "id": "prod_00098",
+    "name": "ছালে কাবাব মসলা",
+    "category": "মশলা",
+    "description": "ছালে কাবাব মসলা, ৫০ গ্রাম",
+    "price_taka": 80
+  },
+  {
+    "id": "prod_00099",
+    "name": "ফিশ কারি মসলা",
+    "category": "মশলা",
+    "description": "মাছের কারি মসলা, ৫০ গ্রাম",
+    "price_taka": 70
+  },
+  {
+    "id": "prod_00100",
+    "name": "চিকেন টিক্কা মসলা",
+    "category": "মশলা",
+    "description": "মুরগির টিক্কা মসলা, ৫০ গ্রাম",
+    "price_taka": 75
+  },
+  {
+    "id": "prod_00101",
+    "name": "ডাল মসলা",
+    "category": "মশলা",
+    "description": "ডাল মসলা, ৫০ গ্রাম",
+    "price_taka": 65
+  },
+  {
+    "id": "prod_00102",
+    "name": "রায়তা এসেন্স",
+    "category": "রান্নার উপাদান",
+    "description": "রায়তা এসেন্স, ৫০ মিলি",
+    "price_taka": 80
+  },
+  {
+    "id": "prod_00103",
+    "name": "আচার",
+    "category": "সংরক্ষণ",
+    "description": "তাজা আম আচার, ২৫০ গ্রাম",
+    "price_taka": 90
+  },
+  {
+    "id": "prod_00104",
+    "name": "আদার আচার",
+    "category": "সংরক্ষণ",
+    "description": "আদার আচার, ২০০ গ্রাম",
+    "price_taka": 85
+  },
+  {
+    "id": "prod_00105",
+    "name": "রসুনের আচার",
+    "category": "সংরক্ষণ",
+    "description": "রসুনের আচার, ২০০ গ্রাম",
+    "price_taka": 80
+  },
+  {
+    "id": "prod_00106",
+    "name": "মিষ্টি আমের চাটনি",
+    "category": "সংরক্ষণ",
+    "description": "মিষ্টি আমের চাটনি, ২০০ গ্রাম",
+    "price_taka": 100
+  },
+  {
+    "id": "prod_00107",
+    "name": "পেঁয়াজের চাটনি",
+    "category": "সংরক্ষণ",
+    "description": "পেঁয়াজের চাটনি, ২০০ গ্রাম",
+    "price_taka": 75
+  },
+  {
+    "id": "prod_00108",
+    "name": "টমেটোর চাটনি",
+    "category": "সংরক্ষণ",
+    "description": "টমেটোর চাটনি, ২০০ গ্রাম",
+    "price_taka": 80
+  },
+  {
+    "id": "prod_00109",
+    "name": "নিম পাতার পেস্ট",
+    "category": "রান্নার উপাদান",
+    "description": "তাজা নিম পাতার পেস্ট, ২০০ গ্রাম",
+    "price_taka": 95
+  },
+  {
+    "id": "prod_00110",
+    "name": "তুলসী পাতার পেস্ট",
+    "category": "রান্নার উপাদান",
+    "description": "তাজা তুলসী পাতার পেস্ট, ২০০ গ্রাম",
+    "price_taka": 100
+  },
+  {
+    "id": "prod_00111",
+    "name": "পুদিনা পাতার পেস্ট",
+    "category": "রান্নার উপাদান",
+    "description": "তাজা পুদিনা পাতার পেস্ট, ২০০ গ্রাম",
+    "price_taka": 90
+  }
+]
