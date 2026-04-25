@@ -11,7 +11,13 @@ import sys
 import time
 import unicodedata
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+
+# Ensure project root is on sys.path regardless of how this script is invoked
+# (python indexer/pipeline.py from project root, or python pipeline.py from indexer/)
+_PROJECT_ROOT = Path(__file__).parent.parent.absolute()
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
 import pandas as pd
 
@@ -186,6 +192,5 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    sys.path.insert(0, str(Path(__file__).parent.parent))
     from typing import Optional  # noqa: F811
     asyncio.run(main())

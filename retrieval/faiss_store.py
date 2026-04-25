@@ -50,16 +50,22 @@ class FAISSStore:
                 vecs = vectors.astype(np.float32)
                 # Normalize to unit sphere — cosine sim = inner product on L2-normalized vecs
                 faiss.normalize_L2(vecs)
+                n = vecs.shape[0]
 
-                # Inner-product quantizer + IVF-Flat index
+                # FAISS requires at least 39*nlist training points for reliable IVF.
+                # For small datasets, fall back to a flat inner-product index.
+                effective_nlist = min(self.nlist, max(1, n // 39))
+                if effective_nlist < 2 or n < 50:
+                    # Flat index — O(n) scan, fine for <1k vectors
+                    idx = faiss.IndexFlatIP(self.dimension)
+                    idx.add(vecs)
+                    return idx
+
                 quantizer = faiss.IndexFlatIP(self.dimension)
-                idx = faiss.IndexIVFFlat(quantizer, self.dimension, self.nlist, faiss.METRIC_INNER_PRODUCT)
-
-                if vecs.shape[0] >= self.nlist:
-                    idx.train(vecs)
-
+                idx = faiss.IndexIVFFlat(quantizer, self.dimension, effective_nlist, faiss.METRIC_INNER_PRODUCT)
+                idx.train(vecs)
                 idx.add(vecs)
-                idx.nprobe = 8  # probe 8/32 cells — good recall for 5k vectors
+                idx.nprobe = min(8, effective_nlist)
                 return idx
 
             self.index = await loop.run_in_executor(None, build)
