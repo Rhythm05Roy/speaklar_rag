@@ -112,7 +112,7 @@ class SemanticCache:
         norm_query = " ".join(query.strip().split()).lower()
 
         # ── Tier 1: semantic similarity ───────────────────────────────────────
-        if self._embedder is not None and query_embedding is not None and len(self._lru) > 0:
+        if query_embedding is not None and len(self._lru) > 0:
             best_sim, best_key = self._find_most_similar(query_embedding)
             if best_sim >= self.threshold:
                 _, payload = self._lru[best_key]

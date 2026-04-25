@@ -86,8 +86,10 @@ PRONOUN_SET: frozenset[str] = frozenset({
 })
 
 # Pre-compiled combined pattern for fast pronoun detection
+# NOTE: \b word boundary is ASCII-only and fails on Bangla Unicode chars.
+# Using (?<![\u0980-\u09FF]) / (?![\u0980-\u09FF]) instead.
 _PRONOUN_PATTERN = re.compile(
-    r"\b(" + "|".join(re.escape(p) for p in PRONOUN_SET) + r")\b"
+    r"(?<![\u0980-\u09FF])" + "(" + "|".join(re.escape(p) for p in sorted(PRONOUN_SET, key=len, reverse=True)) + r")" + r"(?![\u0980-\u09FF])"
 )
 
 

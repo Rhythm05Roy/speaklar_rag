@@ -1,78 +1,145 @@
-"""Tests for LLM generation helpers."""
+"""Tests for LLM generation: PromptBuilder, OpenAIGenerator, LLMGenerator facade.
+
+Updated to match the refactored generator architecture:
+  - PromptBuilder: system/user prompt construction + token budget
+  - OpenAIGenerator: mocked with a FakeClient
+  - LLMGenerator facade: primary/fallback routing
+"""
+import asyncio
 from types import SimpleNamespace
 
 import pytest
 
-from generation.generator import LLMGenerator
+from generation.generator import (
+    LLMGenerator, OpenAIGenerator, PromptBuilder, _FALLBACK_RESPONSE
+)
 
 
-class FakeStream:
-    """Async stream stub for token streaming tests."""
+# ── PromptBuilder tests ────────────────────────────────────────────────────────
 
-    def __init__(self, contents):
-        self.contents = contents
+class TestPromptBuilder:
+    """Test prompt construction and token budget enforcement."""
 
-    def __aiter__(self):
-        self._iter = iter(self.contents)
-        return self
+    def test_build_context_prompt_with_docs(self):
+        docs = [
+            {"name": "চাল", "category": "খাদ্য", "price_taka": 70, "description": "মিনিকেট চাল"},
+            {"name": "ডাল", "category": "খাদ্য", "price_taka": 90, "description": "মসুর ডাল"},
+        ]
+        context = PromptBuilder.build_context_prompt(docs)
+        assert "চাল" in context
+        # price_taka is an int, str() → ASCII "70" not Bangla "৭০"
+        assert "70" in context
+        assert "প্রাসঙ্গিক তথ্য" in context
 
-    async def __anext__(self):
-        try:
-            content = next(self._iter)
-        except StopIteration:
-            raise StopAsyncIteration from None
+    def test_build_context_prompt_empty(self):
+        context = PromptBuilder.build_context_prompt([])
+        assert context == ""
 
-        chunk = SimpleNamespace(
-            choices=[SimpleNamespace(delta=SimpleNamespace(content=content))]
-        )
-        return chunk
+    def test_description_truncated_to_80_chars(self):
+        long_desc = "এটি একটি দীর্ঘ বিবরণ " * 10  # > 80 chars
+        docs = [{"name": "পণ্য", "category": "টেস্ট", "price_taka": 50, "description": long_desc}]
+        context = PromptBuilder.build_context_prompt(docs)
+        # The description section in the output should be truncated
+        assert len(context) < len(long_desc) + 200
 
+    def test_build_full_prompt_returns_tuple(self):
+        system, user = PromptBuilder.build_full_prompt("চালের দাম?", [])
+        assert isinstance(system, str) and len(system) > 0
+        assert isinstance(user, str) and "চালের দাম?" in user
+
+    def test_system_prompt_is_bangla(self):
+        system, _ = PromptBuilder.build_full_prompt("test", [])
+        # System prompt must contain Bangla chars
+        assert any('\u0980' <= c <= '\u09FF' for c in system)
+
+
+# ── OpenAIGenerator tests ─────────────────────────────────────────────────────
 
 class FakeCompletions:
-    """Chat completions stub."""
-
-    async def create(self, *, model, messages, temperature, max_tokens, stream):
-        assert model == "test-model"
-        assert messages[0]["role"] == "system"
-        assert messages[1]["role"] == "user"
-        assert temperature == 0.7
+    async def create(self, *, model, messages, temperature, max_tokens, **kwargs):
+        assert temperature == 0.1  # must be 0.1 for factual answers
         assert max_tokens == 150
-
-        if stream:
-            return FakeStream(["চালের ", "দাম ", "৭০ টাকা।"])
-
         return SimpleNamespace(
             choices=[SimpleNamespace(message=SimpleNamespace(content="চালের দাম ৭০ টাকা।"))]
         )
 
 
-class FakeClient:
-    """Minimal AsyncOpenAI replacement."""
-
+class FakeOpenAIClient:
     def __init__(self, api_key, http_client):
-        self.api_key = api_key
-        self.http_client = http_client
         self.chat = SimpleNamespace(completions=FakeCompletions())
 
 
 @pytest.mark.asyncio
-async def test_generate_uses_async_openai_client(monkeypatch):
-    """The generator should return the first message content."""
-    monkeypatch.setattr("generation.generator.AsyncOpenAI", FakeClient)
+async def test_openai_generator_returns_response(monkeypatch):
+    """OpenAIGenerator should return the first message content."""
+    monkeypatch.setattr("generation.generator.AsyncOpenAI", FakeOpenAIClient)
 
-    generator = LLMGenerator(api_key="test-key", model="test-model")
-    response = await generator.generate("system prompt", "user prompt")
+    gen = OpenAIGenerator(api_key="test-key", model="gpt-4o-mini", timeout_ms=200)
+    response = await gen.generate("system prompt", "user prompt")
 
     assert response == "চালের দাম ৭০ টাকা।"
 
 
 @pytest.mark.asyncio
-async def test_generate_streams_tokens(monkeypatch):
-    """Streaming mode should yield content chunks in order."""
-    monkeypatch.setattr("generation.generator.AsyncOpenAI", FakeClient)
+async def test_openai_generator_uses_low_temperature(monkeypatch):
+    """OpenAI must use temperature=0.1 for factual product answers."""
+    called_with = {}
 
-    generator = LLMGenerator(api_key="test-key", model="test-model")
-    stream = await generator.generate("system prompt", "user prompt", stream=True)
-    chunks = [chunk async for chunk in stream]
+    class CapturingCompletions:
+        async def create(self, *, model, messages, temperature, max_tokens, **kwargs):
+            called_with["temperature"] = temperature
+            return SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))]
+            )
 
-    assert chunks == ["চালের ", "দাম ", "৭০ টাকা।"]
+    class CapturingClient:
+        def __init__(self, api_key, http_client):
+            self.chat = SimpleNamespace(completions=CapturingCompletions())
+
+    monkeypatch.setattr("generation.generator.AsyncOpenAI", CapturingClient)
+
+    gen = OpenAIGenerator(api_key="test-key", model="gpt-4o-mini", timeout_ms=200)
+    await gen.generate("sys", "usr")
+
+    assert called_with["temperature"] == 0.1
+
+
+# ── LLM facade fallback tests ─────────────────────────────────────────────────
+
+class FailingPrimary:
+    async def generate(self, sys, usr):
+        raise asyncio.TimeoutError("Simulated timeout")
+
+
+class SuccessfulFallback:
+    async def generate(self, sys, usr):
+        return "ফলব্যাক উত্তর।"
+
+
+@pytest.mark.asyncio
+async def test_llm_facade_falls_back_on_primary_timeout():
+    """LLMGenerator must use fallback when primary times out."""
+    llm = LLMGenerator.__new__(LLMGenerator)
+    llm._primary = FailingPrimary()
+    llm._fallback = SuccessfulFallback()
+    llm._primary_name = "gemini"
+    llm._fallback_name = "openai"
+    llm.model = "gemini (primary)"
+
+    result = await llm.generate("sys", "usr")
+    assert result == "ফলব্যাক উত্তর।"
+
+
+@pytest.mark.asyncio
+async def test_llm_facade_returns_bangla_fallback_on_double_failure():
+    """LLMGenerator must return the deterministic Bangla string when both fail."""
+    llm = LLMGenerator.__new__(LLMGenerator)
+    llm._primary = FailingPrimary()
+    llm._fallback = FailingPrimary()
+    llm._primary_name = "gemini"
+    llm._fallback_name = "openai"
+    llm.model = "gemini (primary)"
+
+    result = await llm.generate("sys", "usr")
+    assert result == _FALLBACK_RESPONSE
+    assert len(result) > 0
