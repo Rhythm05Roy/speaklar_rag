@@ -355,7 +355,7 @@ Proprietary - Speakler Inc.
 - **Issues**: GitHub Issues
 - **Email**: engineering@speakler.io
 
----
+-----
 
 **Last Updated**: April 2026  
 **Status**: Production Beta  
