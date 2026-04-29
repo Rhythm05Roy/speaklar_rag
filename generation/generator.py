@@ -30,11 +30,14 @@ _FALLBACK_RESPONSE = "দুঃখিত, এই তথ্য এখন পা�
 class PromptBuilder:
     """Builds minimal prompts within the <320 token budget."""
 
-    # ~100 tokens — keep it tight
+    # System prompt optimized for Llama 3.1 — use English instructions
+    # (Llama follows English instructions more reliably) but Bangla output
     SYSTEM_PROMPT_BN = (
-        "আপনি একজন সহায়ক পণ্য-তথ্য বট। "
-        "শুধুমাত্র নিচের প্রসঙ্গ থেকে সংক্ষিপ্ত ও সঠিক উত্তর দিন। "
-        "তথ্য না থাকলে বলুন: 'দুঃখিত, এই তথ্য উপলব্ধ নয়'।"
+        "You are a Bangla product information assistant. "
+        "Answer ONLY in Bangla using the product data provided below. "
+        "The context section contains the relevant products with their prices. "
+        "Give a short, direct answer based on the data. "
+        "If the product is NOT in the context, reply: 'দুঃখিত, এই তথ্য উপলব্ধ নয়'।"
     )
 
     @staticmethod
