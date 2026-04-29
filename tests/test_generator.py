@@ -58,7 +58,7 @@ class TestPromptBuilder:
 class FakeCompletions:
     async def create(self, *, model, messages, temperature, max_tokens, **kwargs):
         assert temperature == 0.1  # must be 0.1 for factual answers
-        assert max_tokens == 150
+        assert max_tokens == 60
         return SimpleNamespace(
             choices=[SimpleNamespace(message=SimpleNamespace(content="চালের দাম ৭০ টাকা।"))]
         )

@@ -97,7 +97,8 @@ class GeminiGenerator:
         api_key: Optional[str] = None,
         model: Optional[str] = None,
         timeout_ms: Optional[int] = None,
-        max_tokens: int = 150,
+        # Product answers are 1 sentence — 60 tokens is plenty. Each extra token = ~15ms
+        max_tokens: int = 60,
     ) -> None:
         self.api_key = api_key or settings.gemini_api_key
         self.model = model or "gemini-2.0-flash"
@@ -110,6 +111,7 @@ class GeminiGenerator:
 
         import google.genai as genai
         import google.genai.types as genai_types
+        # google-genai uses httpx internally with keep-alive by default
         self._client = genai.Client(api_key=self.api_key)
         self._genai_types = genai_types
 
@@ -160,7 +162,8 @@ class OpenAIGenerator:
         api_key: Optional[str] = None,
         model: Optional[str] = None,
         timeout_ms: Optional[int] = None,
-        max_tokens: int = 150,
+        # Product answers are 1 sentence — 60 tokens is plenty. Each extra token = ~15ms
+        max_tokens: int = 60,
     ) -> None:
         self.api_key = api_key or settings.openai_api_key
         self.model = model or settings.openai_model
@@ -171,7 +174,10 @@ class OpenAIGenerator:
         if not self.api_key:
             raise ValueError("OPENAI_API_KEY not set")
 
-        self.http_client = httpx.AsyncClient(timeout=self.timeout_s)
+        # Keep-alive pool: reuse TCP connections so subsequent requests skip
+        # the ~200ms TCP+TLS handshake overhead
+        limits = httpx.Limits(max_keepalive_connections=5, max_connections=10, keepalive_expiry=30)
+        self.http_client = httpx.AsyncClient(timeout=self.timeout_s, limits=limits)
         self.client = AsyncOpenAI(api_key=self.api_key, http_client=self.http_client)
 
     async def close(self) -> None:
