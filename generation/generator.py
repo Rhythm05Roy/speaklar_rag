@@ -1,12 +1,13 @@
-"""LLM integration: Gemini Flash (primary) + OpenAI gpt-4o-mini (fallback).
+"""LLM integration: Groq LPU (primary) + Gemini/OpenAI (fallback).
 
 Latency budget: <90ms total for LLM generation.
 Design:
-  - GeminiGenerator: primary, targets 40–60ms TTFT
-  - OpenAIGenerator: fallback, targets 60–80ms TTFT
+  - GroqGenerator: primary, targets 40–80ms TTFT on LPU hardware
+  - GeminiGenerator: fallback, targets 60–100ms TTFT
+  - OpenAIGenerator: fallback, targets 200–500ms TTFT
   - LLMGenerator facade: tries primary, falls back on timeout/error
-  - Deterministic Bangla fallback: returned if both providers fail
-  - temperature=0.1 for factual product answers (was 0.7)
+  - Deterministic Bangla fallback: returned if all providers fail
+  - temperature=0.1 for factual product answers
   - Prompt token budget enforced: ~100 system + ~200 context + ~20 query
 """
 import asyncio
@@ -215,6 +216,80 @@ class OpenAIGenerator:
             raise
 
 
+# ── Groq Generator (primary — LPU ultra-low latency) ────────────────────────
+
+class GroqGenerator:
+    """Groq LPU generator — fastest available inference (~60ms TTFT).
+
+    Groq uses OpenAI-compatible API with custom base_url.
+    LPU (Language Processing Unit) hardware delivers ~750-1200 tok/s
+    on Llama 3.3 8B, with deterministic latency and minimal variance.
+    """
+
+    GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+        timeout_ms: Optional[int] = None,
+        max_tokens: int = 60,
+    ) -> None:
+        self.api_key = api_key or settings.groq_api_key
+        self.model = model or settings.groq_model
+        self.timeout_ms = timeout_ms if timeout_ms is not None else settings.groq_timeout_ms
+        self.timeout_s = self.timeout_ms / 1000.0
+        self.max_tokens = max_tokens
+
+        if not self.api_key:
+            raise ValueError("GROQ_API_KEY not set")
+
+        # Keep-alive pool for TCP connection reuse
+        limits = httpx.Limits(max_keepalive_connections=5, max_connections=10, keepalive_expiry=30)
+        self.http_client = httpx.AsyncClient(timeout=self.timeout_s, limits=limits)
+        # Groq is OpenAI-compatible — just set base_url
+        self.client = AsyncOpenAI(
+            api_key=self.api_key,
+            base_url=self.GROQ_BASE_URL,
+            http_client=self.http_client,
+        )
+
+    async def close(self) -> None:
+        await self.http_client.aclose()
+
+    async def generate(self, system_prompt: str, user_prompt: str) -> str:
+        """Generate response via Groq LPU."""
+        start = time.perf_counter()
+        try:
+            response = await asyncio.wait_for(
+                self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    temperature=0.1,
+                    max_tokens=self.max_tokens,
+                ),
+                timeout=self.timeout_s,
+            )
+            text = response.choices[0].message.content or "" if response.choices else ""
+            latency_ms = (time.perf_counter() - start) * 1000
+            metrics.record("groq_generate", latency_ms, success=True)
+            logger.info(f"Groq generated in {latency_ms:.0f}ms ({self.model})")
+            return text.strip()
+        except (asyncio.TimeoutError, APITimeoutError):
+            latency_ms = (time.perf_counter() - start) * 1000
+            metrics.record("groq_timeout", latency_ms, success=False, error_type="TimeoutError")
+            logger.warning(f"Groq timed out after {self.timeout_ms}ms")
+            raise
+        except Exception as e:
+            latency_ms = (time.perf_counter() - start) * 1000
+            metrics.record("groq_error", latency_ms, success=False, error_type=type(e).__name__)
+            logger.error(f"Groq generation failed: {e}")
+            raise
+
+
 # ── LLM Generator Facade ──────────────────────────────────────────────────────
 
 class LLMGenerator:
@@ -222,15 +297,16 @@ class LLMGenerator:
     Facade that routes to primary LLM, falls back to secondary on failure.
 
     Provider order controlled by settings.llm_primary:
+      "groq"    → primary=Groq (fastest), fallback=OpenAI/Gemini
       "gemini"  → primary=Gemini, fallback=OpenAI
       "openai"  → primary=OpenAI, fallback=Gemini
 
-    On double failure, returns the deterministic Bangla fallback string.
+    On total failure, returns the deterministic Bangla fallback string.
     """
 
     def __init__(self) -> None:
-        self._primary: Optional[GeminiGenerator | OpenAIGenerator] = None
-        self._fallback: Optional[GeminiGenerator | OpenAIGenerator] = None
+        self._primary = None
+        self._fallback = None
         self._primary_name = settings.llm_primary
         self._fallback_name = settings.llm_fallback
         self.model = f"{self._primary_name} (primary)"
@@ -241,12 +317,21 @@ class LLMGenerator:
         """Initialize primary and fallback providers based on config."""
         providers: dict = {}
 
+        # Groq (LPU — fastest)
+        if settings.groq_api_key:
+            try:
+                providers["groq"] = GroqGenerator()
+            except Exception as e:
+                logger.warning(f"Groq init failed: {e}")
+
+        # Gemini
         if settings.gemini_api_key:
             try:
                 providers["gemini"] = GeminiGenerator()
             except Exception as e:
                 logger.warning(f"Gemini init failed: {e}")
 
+        # OpenAI
         if settings.openai_api_key:
             try:
                 providers["openai"] = OpenAIGenerator()
@@ -255,7 +340,7 @@ class LLMGenerator:
 
         if not providers:
             raise RuntimeError(
-                "No LLM provider initialized. Set GEMINI_API_KEY and/or OPENAI_API_KEY."
+                "No LLM provider initialized. Set GROQ_API_KEY, GEMINI_API_KEY, and/or OPENAI_API_KEY."
             )
 
         # Assign primary / fallback based on config
@@ -272,10 +357,9 @@ class LLMGenerator:
 
     async def close(self) -> None:
         """Close HTTP clients."""
-        if isinstance(self._primary, OpenAIGenerator):
-            await self._primary.close()
-        if isinstance(self._fallback, OpenAIGenerator):
-            await self._fallback.close()
+        for provider in [self._primary, self._fallback]:
+            if isinstance(provider, (OpenAIGenerator, GroqGenerator)):
+                await provider.close()
 
     async def generate(self, system_prompt: str, user_prompt: str, stream: bool = False) -> str:
         """

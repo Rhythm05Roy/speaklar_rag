@@ -19,9 +19,14 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-2.0-flash"
     gemini_timeout_ms: int = 5000
 
+    # ── Groq Configuration (LPU — ultra-low latency) ─────────────────────────
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.1-8b-instant"
+    groq_timeout_ms: int = 5000
+
     # ── LLM Routing ───────────────────────────────────────────────────────────
-    # "gemini" | "openai"  — primary provider; the other becomes fallback
-    llm_primary: str = "gemini"
+    # "groq" | "gemini" | "openai"  — primary provider; the others are fallbacks
+    llm_primary: str = "groq"
     llm_fallback: str = "openai"
 
     # ── Redis Configuration ───────────────────────────────────────────────────
@@ -80,8 +85,8 @@ class Settings(BaseSettings):
         if not self.redis_url:
             errors.append("REDIS_URL is required but not set")
 
-        if self.llm_primary not in ("gemini", "openai"):
-            errors.append("LLM_PRIMARY must be 'gemini' or 'openai'")
+        if self.llm_primary not in ("groq", "gemini", "openai"):
+            errors.append("LLM_PRIMARY must be 'groq', 'gemini', or 'openai'")
 
         return errors
 
