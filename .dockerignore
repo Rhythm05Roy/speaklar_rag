@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets — never bake into image
+.env
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Test artifacts
+tests/
+benchmark.py
+validate_*.py
+
+# Local dev
+*.log
+*.pid
+
+# Large data artifacts (mounted as Docker volume in production)
+data/indexes/
+data/*.csv
+data/*.json
+
+# OS
+.DS_Store
+Thumbs.db

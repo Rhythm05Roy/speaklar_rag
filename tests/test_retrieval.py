@@ -148,7 +148,7 @@ class TestSemanticCache:
             "retrieved_docs": [{"id": "1", "name": "নুডুলস"}],
         }
 
-        await semantic_cache.set("structured_query", payload, query_embedding=emb)
-        cached = await semantic_cache.get("structured_query", query_embedding=emb)
+        await semantic_cache.set("নুডুলসের দাম কত", payload, query_embedding=emb)
+        cached = await semantic_cache.get("নুডুলসের দাম কত", query_embedding=emb)
 
         assert cached == payload

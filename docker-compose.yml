@@ -1,15 +1,21 @@
 version: '3.9'
 
 services:
-  # ── Redis ──────────────────────────────────────────────────────────────────
+  # ── Redis ─────────────────────────────────────────────────────────────────────
   redis:
     image: redis:7.2-alpine
     container_name: speaklar-redis
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"   # bind to localhost only (not public)
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes --loglevel warning --maxmemory 512mb --maxmemory-policy allkeys-lru
+    command: >
+      redis-server
+      --appendonly yes
+      --loglevel warning
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --requirepass ${REDIS_PASSWORD:-}
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -19,8 +25,11 @@ services:
       - speaklar-net
     restart: unless-stopped
 
-  # ── FastAPI RAG Service ───────────────────────────────────────────────────
+  # ── FastAPI RAG Service ───────────────────────────────────────────────────────
   api:
+    # In production: use pre-built image from GHCR (set API_IMAGE in .env)
+    # In development: build locally
+    image: ${API_IMAGE:-speaklar-rag:local}
     build:
       context: .
       dockerfile: Dockerfile
@@ -30,28 +39,34 @@ services:
     env_file:
       - .env
     environment:
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-}@redis:6379/0
     volumes:
+      # Persist FAISS + BM25 indexes and product data across deploys
       - ./data:/app/data
     depends_on:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/readiness"]
-      interval: 10s
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/readiness"]
+      interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     networks:
       - speaklar-net
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G    # ONNX model + FAISS index ~600MB
+          cpus: '2.0'
 
-  # ── Prometheus ────────────────────────────────────────────────────────────
+  # ── Prometheus ───────────────────────────────────────────────────────────────
   prometheus:
     image: prom/prometheus:v2.51.0
     container_name: speaklar-prometheus
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"   # internal only
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -64,19 +79,18 @@ services:
       - speaklar-net
     restart: unless-stopped
 
-  # ── Grafana ───────────────────────────────────────────────────────────────
+  # ── Grafana ──────────────────────────────────────────────────────────────────
   grafana:
     image: grafana/grafana:10.3.0
     container_name: speaklar-grafana
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"   # internal only — access via SSH tunnel or nginx
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
       - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
     depends_on:
       - prometheus
     networks:

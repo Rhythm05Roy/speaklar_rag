@@ -35,8 +35,9 @@ class Settings(BaseSettings):
     redis_session_ttl: int = 3600
 
     # ── Semantic Cache ────────────────────────────────────────────────────────
-    # Cosine similarity threshold for semantic cache hit (0–1)
-    cache_similarity_threshold: float = 0.92
+    # Set very high (0.98) because Bangla queries like "X দাম কত" share structure
+    # and produce high similarity even with completely different products
+    cache_similarity_threshold: float = 0.98
     # Maximum in-process LRU cache entries (each ~1.5 KB for 384-dim float32)
     semantic_cache_max_entries: int = 2000
 
