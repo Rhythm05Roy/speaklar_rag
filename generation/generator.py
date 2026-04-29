@@ -87,7 +87,10 @@ class PromptBuilder:
 # ── Gemini Generator (primary) ────────────────────────────────────────────────
 
 class GeminiGenerator:
-    """Google Gemini Flash generator — primary LLM provider."""
+    """Google Gemini Flash generator — primary LLM provider.
+
+    Uses the new `google-genai` SDK (google.genai).
+    """
 
     def __init__(
         self,
@@ -97,7 +100,7 @@ class GeminiGenerator:
         max_tokens: int = 150,
     ) -> None:
         self.api_key = api_key or settings.gemini_api_key
-        self.model = model or settings.gemini_model
+        self.model = model or "gemini-2.0-flash"
         self.timeout_ms = timeout_ms if timeout_ms is not None else settings.gemini_timeout_ms
         self.timeout_s = self.timeout_ms / 1000.0
         self.max_tokens = max_tokens
@@ -105,30 +108,35 @@ class GeminiGenerator:
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY not set")
 
-        import google.generativeai as genai
-        genai.configure(api_key=self.api_key)
-        self._genai = genai
-        self._model_obj = genai.GenerativeModel(
-            model_name=self.model,
-            generation_config=genai.GenerationConfig(
-                temperature=0.1,
-                max_output_tokens=self.max_tokens,
-            ),
-        )
+        import google.genai as genai
+        import google.genai.types as genai_types
+        self._client = genai.Client(api_key=self.api_key)
+        self._genai_types = genai_types
 
     async def generate(self, system_prompt: str, user_prompt: str) -> str:
-        """Generate response with 90ms timeout."""
+        """Generate response using the google-genai SDK."""
         start = time.perf_counter()
         combined = f"{system_prompt}\n\n{user_prompt}"
         try:
             loop = asyncio.get_event_loop()
             response = await asyncio.wait_for(
-                loop.run_in_executor(None, lambda: self._model_obj.generate_content(combined)),
+                loop.run_in_executor(
+                    None,
+                    lambda: self._client.models.generate_content(
+                        model=self.model,
+                        contents=combined,
+                        config=self._genai_types.GenerateContentConfig(
+                            temperature=0.1,
+                            max_output_tokens=self.max_tokens,
+                        ),
+                    )
+                ),
                 timeout=self.timeout_s,
             )
             text = response.text or ""
             latency_ms = (time.perf_counter() - start) * 1000
             metrics.record("gemini_generate", latency_ms, success=True)
+            logger.info(f"Gemini generated in {latency_ms:.0f}ms")
             return text.strip()
         except asyncio.TimeoutError:
             latency_ms = (time.perf_counter() - start) * 1000
