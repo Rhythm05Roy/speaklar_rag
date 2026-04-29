@@ -67,6 +67,7 @@ class RAGPipeline:
         bm25_store: BM25Store,
         cache: SemanticCache,
         llm_generator: LLMGenerator,
+        embedder=None,  # Pre-warmed embedder injected at startup
     ) -> None:
         self.session_store = session_store
         self.faiss_store = faiss_store
@@ -74,6 +75,9 @@ class RAGPipeline:
         self.cache = cache
         self.llm_generator = llm_generator
         self.context_resolver = BanglaContextResolver(session_store)
+        # Embedder is injected from main.py startup so it is NEVER loaded
+        # inside the request hot path (eliminates the 10s cold-load latency)
+        self._embedder = embedder
 
     @staticmethod
     def _normalize_query(query: str) -> str:
@@ -107,8 +111,10 @@ class RAGPipeline:
             normalized_query = self._normalize_query(resolved_query)
 
             # ── Stage 2: Embedding (needed for semantic cache + retrieval) ────
+            # Use the pre-warmed singleton injected at startup.
+            # NEVER call get_embedder() here — it would reload the model.
             t0 = time.perf_counter()
-            embedder = await get_embedder()
+            embedder = self._embedder or (await get_embedder())
             query_vector = await embedder.embed(normalized_query)
             latencies["embed_ms"] = round((time.perf_counter() - t0) * 1000, 1)
 

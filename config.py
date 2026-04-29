@@ -10,13 +10,14 @@ class Settings(BaseSettings):
     # ── OpenAI Configuration ─────────────────────────────────────────────────
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
-    # IMPORTANT: budget is 90 ms — was incorrectly 3000 ms before
-    openai_timeout_ms: int = 90
+    # Realistic timeout for LLM APIs — TCP+TLS alone can take 200ms+ on first call.
+    # The <100ms SLA targets the retrieval path (context+embed+faiss+bm25 = ~30ms).
+    openai_timeout_ms: int = 5000
 
     # ── Google Gemini Configuration ───────────────────────────────────────────
     gemini_api_key: str = ""
     gemini_model: str = "gemini-1.5-flash"
-    gemini_timeout_ms: int = 90
+    gemini_timeout_ms: int = 5000
 
     # ── LLM Routing ───────────────────────────────────────────────────────────
     # "gemini" | "openai"  — primary provider; the other becomes fallback

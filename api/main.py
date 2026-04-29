@@ -128,12 +128,14 @@ async def lifespan(app: FastAPI):
     llm_generator = LLMGenerator()
 
     # ── Pipeline ──────────────────────────────────────────────────────────────
+    # Pass the pre-warmed embedder so process_query() never reloads the model
     _pipeline = RAGPipeline(
         session_store=_session_store,
         faiss_store=_faiss_store,
         bm25_store=_bm25_store,
         cache=_cache,
         llm_generator=llm_generator,
+        embedder=embedder,  # ← eliminates 10s cold-load on every request
     )
 
     logger.info("✓ Speaklar RAG pipeline initialized and ready")
@@ -166,6 +168,10 @@ app = FastAPI(
 
 app.add_middleware(RateLimitMiddleware)
 
+
+@app.get("/")
+async def root():
+    return {"message": "Speaklar RAG API"}
 
 # ── Health / Readiness ────────────────────────────────────────────────────────
 
