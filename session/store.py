@@ -22,6 +22,7 @@ class SessionStore:
         self.session_ttl = settings.redis_session_ttl
         self.history_key_template = "session:{sid}:history"
         self.entities_key_template = "session:{sid}:entities"
+        self.context_key_template = "session:{sid}:context"
         # In-memory fallback store for both history and entities
         self._in_memory_store: Dict[str, Any] = {}
         self._use_in_memory = False
@@ -161,18 +162,52 @@ class SessionStore:
             )
             return [], None
 
+    # ── Structured target context ────────────────────────────────────────────
+
+    async def set_last_context(self, session_id: str, context: Dict[str, Any]) -> None:
+        """Persist structured target context for deterministic follow-up resolution."""
+        key = self.context_key_template.format(sid=session_id)
+        try:
+            if self.redis:
+                await self.redis.setex(key, self.session_ttl, json.dumps(context))
+            else:
+                self._in_memory_store[key] = context
+        except Exception as e:
+            logger.error(
+                f"Failed to set structured context: {e}",
+                extra={"service": "SessionStore", "session_id": session_id, "error": str(e)},
+            )
+
+    async def get_last_context(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Load the last structured target context for a session."""
+        key = self.context_key_template.format(sid=session_id)
+        try:
+            if self.redis:
+                data = await self.redis.get(key)
+                return json.loads(data) if data else None
+            stored = self._in_memory_store.get(key)
+            return dict(stored) if stored is not None else None
+        except Exception as e:
+            logger.error(
+                f"Failed to get structured context: {e}",
+                extra={"service": "SessionStore", "session_id": session_id, "error": str(e)},
+            )
+            return None
+
     # ── Session management ────────────────────────────────────────────────────
 
     async def delete_session(self, session_id: str) -> None:
         """Delete all data for a session."""
         history_key = self.history_key_template.format(sid=session_id)
         entities_key = self.entities_key_template.format(sid=session_id)
+        context_key = self.context_key_template.format(sid=session_id)
         try:
             if self.redis:
-                await self.redis.delete(history_key, entities_key)
+                await self.redis.delete(history_key, entities_key, context_key)
             else:
                 self._in_memory_store.pop(history_key, None)
                 self._in_memory_store.pop(entities_key, None)
+                self._in_memory_store.pop(context_key, None)
             logger.info("Deleted session", extra={"service": "SessionStore", "session_id": session_id})
         except Exception as e:
             logger.error(

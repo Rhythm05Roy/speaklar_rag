@@ -1,362 +1,463 @@
-# Speaklar Bangla RAG System
+# Speaklar Bangla RAG
 
-Production-grade Retrieval-Augmented Generation (RAG) system for Bangla conversational AI with **<100ms end-to-end latency**.
+Production-oriented Bangla retrieval-augmented assistant for product search and multi-turn catalog QA. The system is built around a low-latency deterministic hot path for factual product questions, with hybrid retrieval and LLM generation reserved for queries that cannot be answered safely from structured catalog signals.
 
-## Architecture Highlights
+## What This System Does
 
-- **Sub-100ms Latency**: Optimized for real-time conversational response
-- **Coreference Resolution**: Intelligent handling of multi-turn Bangla conversations
-- **Hybrid Retrieval**: FAISS vector search + BM25 lexical ranking with reciprocal rank fusion
-- **Semantic Caching**: Redis-backed cache for repeated queries
-- **Async Pipeline**: Non-blocking I/O throughout with asyncio
-- **Streaming Support**: WebSocket endpoints for token-by-token response streaming
+- Serves Bangla product queries over a FastAPI API.
+- Resolves short follow-up turns such as `দাম কত টাকা?` using prior conversational context.
+- Answers exact product and product-group questions deterministically when possible.
+- Falls back to hybrid retrieval plus LLM generation for open-ended or unsupported queries.
+- Exposes health, readiness, metrics, session management, and WebSocket interfaces.
 
-## Quick Start
+This codebase is optimized for the assessment-style requirement:
+
+1. Q1: `আপনাদের কোম্পানি কি নুডুলস বিক্রি করে?`
+2. Q2: `দাম কত টাকা?`
+
+The intended behavior is:
+
+- Q1 stores `নুডুলস` as structured conversational context.
+- Q2 resolves against that context.
+- Q2 is answered from an in-memory grouped catalog lookup without calling the embedder or the LLM.
+
+## Architecture
+
+The runtime is intentionally split into two answer paths.
+
+### 1. Deterministic Hot Path
+
+Used for factual queries that can be answered directly from catalog metadata:
+
+- exact product price
+- exact product brand
+- exact product size / pack
+- exact product category
+- product-group existence queries
+- product-group price range queries
+- context-aware follow-up questions that resolve to one of the above
+
+Examples:
+
+- `মিল্কভিটা নুডুলস ৫০০ গ্রাম দাম কত?`
+- `মিল্কভিটা নুডুলস ৫০০ গ্রামের ব্র্যান্ড কী?`
+- `আপনাদের কোম্পানি কি নুডুলস বিক্রি করে?`
+- `দাম কত টাকা?` after a prior noodle turn
+
+This path runs before embedding, FAISS, BM25, semantic cache, and LLM generation.
+
+### 2. Retrieval + LLM Fallback Path
+
+Used only when the system cannot safely answer deterministically:
+
+- open-ended product questions
+- unsupported attributes
+- broad conversational requests
+- weak or ambiguous matches that require synthesis
+
+Fallback flow:
+
+1. query embedding
+2. semantic cache lookup
+3. FAISS vector search + BM25 lexical search in parallel
+4. reciprocal rank fusion
+5. conservative deterministic rendering from retrieved docs when possible
+6. prompt construction
+7. primary LLM with fallback provider chain
+
+## High-Level Request Flow
+
+### Deterministic exact/group flow
+
+```text
+request
+  -> context resolver
+  -> structured session context lookup
+  -> deterministic responder
+  -> template/group response
+```
+
+### Fallback RAG flow
+
+```text
+request
+  -> context resolver
+  -> structured session context lookup
+  -> deterministic responder miss
+  -> embed query
+  -> semantic cache
+  -> FAISS + BM25
+  -> RRF fusion
+  -> deterministic render from retrieved docs OR LLM generation
+```
+
+## Core Components
+
+### API layer
+
+- [api/main.py](api/main.py)
+  FastAPI app, startup lifecycle, REST endpoints, WebSocket endpoint, readiness and metrics.
+- [api/pipeline.py](api/pipeline.py)
+  End-to-end orchestrator with deterministic pre-embedding routing.
+- [api/middleware.py](api/middleware.py)
+  Request IDs, latency headers, and Redis-backed rate limiting.
+
+### Context and conversation state
+
+- [context/resolver.py](context/resolver.py)
+  Bangla coreference resolution and short-follow-up rewriting.
+- [context/rewriter.py](context/rewriter.py)
+  Query rewriting utilities.
+- [session/store.py](session/store.py)
+  Redis-backed session history, last entities, and structured deterministic target context.
+
+### Deterministic answer engine
+
+- [generation/deterministic.py](generation/deterministic.py)
+  Intent detection, exact-name matching, grouped product-type lookups, range answers, and follow-up resolution from stored target context.
+- [utils/product_metadata.py](utils/product_metadata.py)
+  Offline and runtime metadata enrichment for brand, product type, and pack size extraction.
+
+### Retrieval
+
+- [retrieval/embedder.py](retrieval/embedder.py)
+  Singleton multilingual E5 embedder with ONNX-first loading.
+- [retrieval/faiss_store.py](retrieval/faiss_store.py)
+  FAISS cosine-similarity search with persistence.
+- [retrieval/bm25_store.py](retrieval/bm25_store.py)
+  Bangla BM25 lexical search with persistence.
+- [retrieval/cache.py](retrieval/cache.py)
+  Two-tier semantic cache: in-process cosine similarity plus Redis exact-match.
+- [retrieval/fusion.py](retrieval/fusion.py)
+  Reciprocal rank fusion over FAISS and BM25 results.
+
+### Generation and observability
+
+- [generation/generator.py](generation/generator.py)
+  Prompt builder and LLM provider facade for Groq, Gemini, and OpenAI.
+- [utils/metrics.py](utils/metrics.py)
+  In-memory metrics and Prometheus export.
+- [utils/logger.py](utils/logger.py)
+  Structured application logging.
+
+### Offline data and indexing
+
+- [indexer/pipeline.py](indexer/pipeline.py)
+  Batch normalization, enrichment, embedding, and index persistence.
+- [data/products.csv](data/products.csv)
+  Product dataset.
+- [data/generate_mock_data.py](data/generate_mock_data.py)
+  Mock data generation utilities.
+
+## Product Resolution Policy
+
+The code intentionally distinguishes between exact product queries and broader product-group queries.
+
+- Exact query -> exact answer
+- Partial grouped query -> narrowed grouped answer
+- Broad product-group query -> group-level answer, typically a price range
+- Unsupported attribute -> deterministic unavailable response or fallback
+- Open-ended conversational query -> LLM path
+
+Examples:
+
+- `মিল্কভিটা নুডুলস ৫০০ গ্রাম দাম কত?`
+  -> `মিল্কভিটা নুডুলস ৫০০ গ্রামের দাম ৫৬ টাকা।`
+- `নুডুলসের দাম কত?`
+  -> `নুডুলসের দাম ৫৬ টাকা থেকে ৪১৬ টাকা পর্যন্ত।`
+- `আপনাদের কোম্পানি কি নুডুলস বিক্রি করে?`
+  -> `হ্যাঁ, নুডুলস বিক্রি করা হয়।`
+
+This avoids the common failure mode where a broad query randomly returns the price of a single SKU.
+
+## Setup
 
 ### Prerequisites
 
 - Python 3.10+
-- Docker (for Redis)
-- OpenAI API key
+- Redis
+- One configured LLM provider for fallback generation:
+  - `GROQ_API_KEY`, or
+  - `OPENAI_API_KEY`, or
+  - `GEMINI_API_KEY`
 
-### 1. Clone & Setup
-
-```bash
-cd speaklar_rag
-cp .env.example .env
-# Edit .env and set OPENAI_API_KEY
-```
-
-### 2. Install Dependencies
+### Local environment
 
 ```bash
-make install
-# or: pip install -r requirements.txt
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-### 3. Start Infrastructure
+Create a `.env` file or update the existing one. At minimum, configure:
 
 ```bash
-make docker-up
-# Starts Redis container at localhost:6379
+GROQ_API_KEY=...
+OPENAI_API_KEY=...
+GEMINI_API_KEY=...
+LLM_PRIMARY=groq
+LLM_FALLBACK=openai
+REDIS_URL=redis://localhost:6379/0
+DATA_DIR=./data
+INDEX_DIR=./data/indexes
 ```
 
-### 4. Generate Mock Data & Indexes
+### Start infrastructure
 
 ```bash
-python bootstrap.py  # Full system check
-# or:
-python indexer/pipeline.py  # Build indexes only
+docker-compose up -d redis
 ```
 
-### 5. Run API Server
+Or start the full stack:
+
+```bash
+docker-compose up -d
+```
+
+This compose file includes:
+
+- Redis
+- API service
+- Prometheus
+- Grafana
+
+### Build indexes
+
+If indexes are not already present:
+
+```bash
+python indexer/pipeline.py --data-path ./data/products.csv --index-dir ./data/indexes
+```
+
+### Run the API
+
+```bash
+uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Or:
 
 ```bash
 make run
-# API will be available at http://localhost:8000
 ```
 
-### 6. Test
+## API
 
-```bash
-# Interactive docs: http://localhost:8000/docs
+### `POST /query`
 
-# REST query:
-curl -X POST http://localhost:8000/query \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "query": "চালের দাম কত?",
-    "session_id": "user_123"
-  }'
+Request:
 
-# WebSocket (streaming):
-# Connect to ws://localhost:8000/ws?session_id=user_123
-# Send: {"query": "নুডুলসের দাম জানতে চাই"}
-```
-
-## Project Structure
-
-```
-speaklar_rag/
-├── api/
-│   ├── main.py              # FastAPI app + endpoints
-│   ├── middleware.py        # Rate limiting
-│   └── pipeline.py          # End-to-end orchestrator
-├── context/
-│   ├── ner.py              # Bangla NER (lightweight)
-│   ├── rewriter.py         # Query rewriting (coreference)
-│   └── resolver.py         # Context resolution orchestrator
-├── retrieval/
-│   ├── embedder.py         # Singleton e5-small model
-│   ├── faiss_store.py      # Vector search (IVF-Flat)
-│   ├── bm25_store.py       # Lexical search
-│   ├── cache.py            # Semantic cache (Redis)
-│   └── fusion.py           # Reciprocal rank fusion
-├── generation/
-│   └── generator.py        # LLM + prompt builder
-├── session/
-│   └── store.py            # Redis session management
-├── indexer/
-│   └── pipeline.py         # Offline batch indexing
-├── utils/
-│   ├── logger.py           # Structured logging
-│   └── metrics.py          # Latency tracking
-├── data/
-│   └── generate_mock_data.py    # Mock dataset generator
-├── tests/                        # Unit + integration tests
-├── bootstrap.py            # System validation
-├── config.py               # Configuration (pydantic)
-├── docker-compose.yml      # Redis container
-├── requirements.txt        # Dependencies
-└── Makefile               # Commands
-```
-
-## API Documentation
-
-### REST Endpoints
-
-#### `POST /query`
-
-Process a query synchronously.
-
-**Request:**
 ```json
 {
   "query": "নুডুলসের দাম কত?",
-  "session_id": "optional_session_id",
-  "stream": false
+  "session_id": "demo-session"
 }
 ```
 
-**Response:**
+Response shape:
+
 ```json
 {
-  "session_id": "session_xyz",
+  "session_id": "demo-session",
+  "request_id": "4aa74369",
   "query": "নুডুলসের দাম কত?",
-  "response": "নুডুলসের দাম ৬০ টাকা।",
+  "response": "নুডুলসের দাম ৫৬ টাকা থেকে ৪১৬ টাকা পর্যন্ত।",
   "coref_resolved": false,
+  "cache_hit": false,
   "retrieved_docs": [
     {
-      "name": "ডিম নুডুলস",
-      "price": 60,
-      "score": 0.95
+      "name": "রাধুনী নুডুলস ১ কেজি",
+      "price": 110,
+      "score": 0.0323,
+      "sources": ["faiss", "bm25"]
     }
   ],
   "latencies": {
-    "context_resolution_ms": 2.3,
-    "embedding_ms": 3.1,
-    "retrieval_ms": 8.5,
-    "llm_generation_ms": 62.4,
-    "total_ms": 78.2
+    "context_ms": 2.1,
+    "exact_lookup_ms": 1.4,
+    "embed_ms": 0.0,
+    "cache_ms": 0.0,
+    "retrieval_ms": 0.0,
+    "fusion_ms": 0.0,
+    "template_ms": 1.4,
+    "llm_ms": 0.0,
+    "total_ms": 4.3
   }
 }
 ```
 
-#### `GET /health`
+### `GET /health`
 
-Health check with metrics snapshot.
+Basic liveness plus Redis and cache stats.
 
-#### `GET /metrics`
+### `GET /readiness`
 
-System performance metrics (5-minute window).
+Readiness check that confirms the API pipeline and search indexes are loaded.
 
-#### `DELETE /session/{session_id}`
+### `GET /metrics`
 
-Delete session history.
+Prometheus-format metrics endpoint.
 
-### WebSocket Endpoint
+### `GET /metrics/json`
 
-#### `WebSocket /ws`
+JSON-formatted in-memory metrics snapshot.
 
-Streaming responses with real-time token delivery.
+### `DELETE /session/{session_id}`
 
-**Client Message:**
-```json
-{"query": "চালের দাম কত?"}
+Deletes session history, last entities, and structured target context.
+
+### `WebSocket /ws`
+
+Bidirectional endpoint for interactive use. The current implementation streams the already-built final response chunked by word; it is not yet true token streaming from the underlying LLM provider.
+
+## Example Conversations
+
+### Requirement-style context-aware flow
+
+```text
+Q1: আপনাদের কোম্পানি কি নুডুলস বিক্রি করে?
+A1: হ্যাঁ, নুডুলস বিক্রি করা হয়।
+
+Q2: দাম কত টাকা?
+A2: নুডুলসের দাম ৫৬ টাকা থেকে ৪১৬ টাকা পর্যন্ত।
 ```
 
-**Server Messages:**
-```json
-{"type": "token", "data": "চালের "}
-{"type": "token", "data": "দাম "}
-{"type": "done", "data": {...metadata...}}
+### Exact product flow
+
+```text
+Q: মিল্কভিটা নুডুলস ৫০০ গ্রাম দাম কত?
+A: মিল্কভিটা নুডুলস ৫০০ গ্রামের দাম ৫৬ টাকা।
 ```
 
-## Performance Targets
+### Fallback LLM flow
 
-| Stage | Budget | Implementation |
-|-------|--------|-----------------|
-| Context Resolution | ~2ms | Regex NER + entity store lookup |
-| Query Embedding | ~3ms | e5-small in RAM |
-| FAISS Search | ~5ms | IVF-Flat, 5k vectors, nlist=32 |
-| BM25 Search | ~3ms | rank-bm25 (parallel) |
-| RRF Fusion | <1ms | Pure Python merge |
-| LLM Generation | ~60ms | GPT-4o-mini TTFT |
-| **Total (cache miss)** | **~85ms** | |
-| **Total (cache hit)** | **~10ms** | |
+```text
+Q: ভালো নুডুলস কোনটা?
+A: retrieval + LLM path
+```
 
-Actual median latencies: 72-78ms ✓
+## Performance Model
+
+This repository has two different latency profiles.
+
+### Deterministic path
+
+Designed for:
+
+- exact factual product lookups
+- grouped product-type existence and price questions
+- context-aware follow-up lookups
+
+Expected behavior:
+
+- no embedder call
+- no FAISS/BM25 call
+- no LLM call
+
+This is the path intended to satisfy the sub-100ms requirement.
+
+### Retrieval / LLM path
+
+Used for:
+
+- open-ended generation
+- unsupported fields
+- conversational questions
+- ambiguous cases that cannot be safely answered deterministically
+
+This path is more expensive and should not be treated as a hard sub-100ms SLA path in production.
 
 ## Configuration
 
-See `.env.example` for all settings. Key variables:
+Settings are defined in [config.py](config.py). Important variables include:
 
 ```bash
-# LLM
-OPENAI_API_KEY=sk-xxx
+GROQ_API_KEY=
+GROQ_MODEL=llama-3.1-8b-instant
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-2.0-flash
+OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4o-mini
-OPENAI_TIMEOUT_MS=3000
+LLM_PRIMARY=groq
+LLM_FALLBACK=openai
 
-# Redis
 REDIS_URL=redis://localhost:6379/0
+REDIS_CACHE_TTL=3600
 REDIS_SESSION_TTL=3600
 
-# API
+CACHE_SIMILARITY_THRESHOLD=0.98
+SEMANTIC_CACHE_MAX_ENTRIES=2000
+
 API_HOST=0.0.0.0
 API_PORT=8000
-DEBUG=true
+DEBUG=false
 LOG_LEVEL=INFO
-```
 
-## Usage Examples
-
-### Python Client
-
-```python
-import asyncio
-import aiohttp
-
-async def query():
-    async with aiohttp.ClientSession() as session:
-        payload = {
-            "query": "নুডুলসের দাম?",
-            "session_id": "user_001"
-        }
-        async with session.post(
-            "http://localhost:8000/query",
-            json=payload
-        ) as resp:
-            result = await resp.json()
-            print(result["response"])
-
-asyncio.run(query())
-```
-
-### Multi-Turn Conversation
-
-```python
-# Turn 1: Establish context
-Q1 = "আর্মানের কি নুডুলস বিক্রি করেন?"  # Noodles mention
-# → Response about noodles + stored in session
-
-# Turn 2: Elliptic reference
-Q2 = "দাম কত?"  # Missing subject
-# → System resolves: "নুডুলসের দাম কত?" (coreference)
-# → Response: "নুডুলসের দাম ৬০ টাকা।"
+DATA_DIR=./data
+INDEX_DIR=./data/indexes
 ```
 
 ## Development
 
-### Run Tests
+### Common commands
 
 ```bash
+make install
+make docker-up
+make run
 make test
-# Or: pytest tests/ -v --cov=.
+make lint
+make format
 ```
 
-### Code Quality
+### Tests
+
+The repository includes unit and pipeline coverage for:
+
+- context resolution
+- deterministic answer routing
+- retrieval logic
+- latency-oriented orchestration
+- LLM fallback behavior
+
+Run:
 
 ```bash
-make lint    # Check with ruff
-make format  # Format with black
+pytest tests/ -v --cov=. --cov-report=term-missing
 ```
 
-### Build Indexes
+For environments where the local `.env` contains non-boolean debug values, override `DEBUG` when running tests:
 
 ```bash
-# One-time offline indexing
-python indexer/pipeline.py
-
-# Indexes saved to data/indexes/
+DEBUG=false pytest tests/ -v
 ```
 
-## Production Deployment
+### Validation and benchmarking
 
-### Docker
+- [bootstrap.py](bootstrap.py)
+  environment checks and quickstart validation
+- [benchmark.py](benchmark.py)
+  assessment-oriented benchmark script
+- [validate_fixes.py](validate_fixes.py)
+  static validation helper
+- [validate_static.py](validate_static.py)
+  additional validation helper
 
-```bash
-# Build image
-docker build -t speaklar-rag .
+## Deployment Notes
 
-# Run with Docker Compose
-docker-compose up
-```
+- The Docker image pre-bakes the ONNX embedding model to avoid export-on-startup delays.
+- The compose stack mounts `./data` into the API container so indexes can survive restarts.
+- Readiness depends on both FAISS and BM25 indexes being available.
+- Redis failures degrade gracefully to in-memory behavior for sessions and semantic caching.
+- One worker is used in the container entrypoint to keep model memory predictable.
 
-### Kubernetes
+## Current Limitations
 
-```yaml
-# helm/values.yaml
-replicas: 3
-redis:
-  sentinal: true
-monitoring:
-  datadog: true
-```
-
-### Monitoring
-
-Metrics exported via structured logging (JSON format). Integration ready for:
-- Datadog
-- New Relic
-- Prometheus (via OpenTelemetry)
-
-## Known Limitations & Tradeoffs
-
-1. **NER Model**: Lightweight regex-based (not ML-based) - sufficient for short product names but may miss complex entity types
-2. **Embedding Model**: `e5-small` chosen for speed (~3ms) over `e5-base` accuracy
-3. **Dataset**: 5,000 products maximum (fits in ~8MB RAM for FAISS)
-4. **LLM Latency**: Bound by OpenAI API (60-70ms typical); consider using `gemini-1.5-flash` for faster TTFT
-5. **Coreference**: Handles ellipsis + entity carry-forward; more complex anaphora not supported
-
-## Roadmap
-
-- [ ] Multi-language support (Hindi, Tamil, Telugu, Urdu)
-- [ ] Local LLM fallback (Llama 2 7B for offline mode)
-- [ ] Advanced coreference resolution (transformer-based)
-- [ ] Adaptive caching with TTL per query frequency
-- [ ] A/B testing framework for ranking tuning
-- [ ] Admin dashboard for session analytics
-
-## Architecture Decision Records (ADRs)
-
-See `docs/adr/` for detailed rationale on:
-- Why FAISS IVF-Flat over HNSW
-- Why e5-small over Bangla-specific embedders
-- Why Redis for session + semantic cache
-- Why RRF for hybrid fusion
-
-## Contributing
-
-Contributing guide coming soon. For now:
-
-1. Fork the repo
-2. Create feature branch (`git checkout -b feature/foo`)
-3. Write tests
-4. Run `make lint && make test`
-5. Submit PR
+- Broad product-group answers are intentionally conservative and mainly implemented for sell/existence and price queries.
+- The WebSocket endpoint is response-chunk streaming, not provider-native token streaming.
+- The deterministic path depends on metadata quality extracted from semi-structured product names and descriptions.
+- LLM fallback quality and latency depend on provider configuration and network conditions.
 
 ## License
 
-Proprietary - Speakler Inc.
-
-## Support
-
-- **Docs**: This README + inline code comments
-- **Issues**: GitHub Issues
-- **Email**: engineering@speakler.io
-
------
-
-**Last Updated**: April 2026  
-**Status**: Production Beta  
-**Latency**: <100ms (verified)
+This repository is distributed under the MIT License per [pyproject.toml](pyproject.toml).

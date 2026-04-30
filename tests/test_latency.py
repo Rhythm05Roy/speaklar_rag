@@ -116,7 +116,7 @@ async def test_pipeline_returns_valid_response_structure(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_pipeline_caches_response_and_skips_llm(monkeypatch):
-    """On second identical query, LLM must NOT be called again."""
+    """On second identical LLM-backed query, the cache should skip another LLM call."""
     import asyncio
 
     async def fake_get_embedder():
@@ -133,9 +133,9 @@ async def test_pipeline_caches_response_and_skips_llm(monkeypatch):
         llm_generator=llm,
     )
 
-    first = await pipeline.process_query("sess-1", "চালের দাম কত?")
+    first = await pipeline.process_query("sess-1", "চাল সম্পর্কে বলো")
     await asyncio.sleep(0.01)  # allow fire-and-forget tasks to settle
-    second = await pipeline.process_query("sess-1", "চালের দাম কত?")
+    second = await pipeline.process_query("sess-1", "চাল সম্পর্কে বলো")
 
     assert first.response == "চালের দাম ৭০ টাকা।"
     assert second.response == "চালের দাম ৭০ টাকা।"

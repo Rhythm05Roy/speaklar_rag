@@ -94,6 +94,7 @@ class DummySessionStore:
     def __init__(self):
         self.history: dict = {}
         self.entities: dict = {}
+        self.context: dict = {}
         self._use_in_memory = True
 
     async def append_to_history(self, sid, turn):
@@ -111,8 +112,53 @@ class DummySessionStore:
     async def get_session_context(self, sid):
         return self.history.get(sid, []), self.entities.get(sid)
 
+    async def set_last_context(self, sid, context):
+        self.context[sid] = context
+
+    async def get_last_context(self, sid):
+        return self.context.get(sid)
+
 
 class DummyFAISSStore:
+    def __init__(self):
+        self.products = {
+            "p1": {
+                "id": "p1",
+                "name": "চাল",
+                "price_taka": 70,
+                "category": "খাদ্য",
+                "description": "মিনিকেট চাল",
+            },
+            "prod_exact": {
+                "id": "prod_exact",
+                "name": "মিল্কভিটা কালিজিরা চাল ৫ কেজি",
+                "price_taka": 670,
+                "category": "খাদ্যশস্য",
+                "description": "সুগন্ধী কালিজিরা চাল, ৫ কেজি, মিল্কভিটা ব্র্যান্ড",
+            },
+            "prod_noodles": {
+                "id": "prod_noodles",
+                "name": "রাধুনী নুডুলস ১ কেজি",
+                "price_taka": 110,
+                "category": "তাৎক্ষণিক খাদ্য",
+                "description": "ডিম নুডুলস, ১ কেজি, রাধুনী ব্র্যান্ড",
+            },
+            "prod_noodles_2": {
+                "id": "prod_noodles_2",
+                "name": "মিল্কভিটা নুডুলস ৫০০ গ্রাম",
+                "price_taka": 56,
+                "category": "তাৎক্ষণিক খাদ্য",
+                "description": "ডিম নুডুলস, ৫০০ গ্রাম, মিল্কভিটা ব্র্যান্ড",
+            },
+            "prod_noodles_3": {
+                "id": "prod_noodles_3",
+                "name": "সুরভি নুডুলস ৫ কেজি",
+                "price_taka": 416,
+                "category": "তাৎক্ষণিক খাদ্য",
+                "description": "ডিম নুডুলস, ৫ কেজি, সুরভি ব্র্যান্ড",
+            },
+        }
+
     async def search(self, query_vector, top_k=5):
         return [
             {"id": "p1", "name": "চাল", "price_taka": 70, "category": "খাদ্য",

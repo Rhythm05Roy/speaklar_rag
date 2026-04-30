@@ -36,6 +36,7 @@ from retrieval.bm25_store import BM25Store
 from retrieval.cache import SemanticCache
 from retrieval.fusion import reciprocal_rank_fusion
 from context.resolver import BanglaContextResolver
+from generation.deterministic import DeterministicResponder
 from generation.generator import PromptBuilder, LLMGenerator
 from session.store import SessionStore
 from utils.logger import logger
@@ -69,12 +70,23 @@ class RAGPipeline:
         llm_generator: LLMGenerator,
         embedder=None,  # Pre-warmed embedder injected at startup
     ) -> None:
+        products: List[Dict[str, Any]] = []
+        if hasattr(faiss_store, "products") and getattr(faiss_store, "products"):
+            faiss_products = getattr(faiss_store, "products")
+            if isinstance(faiss_products, dict):
+                products = list(faiss_products.values())
+            else:
+                products = list(faiss_products)
+        elif hasattr(bm25_store, "products_list") and getattr(bm25_store, "products_list"):
+            products = list(getattr(bm25_store, "products_list"))
+
         self.session_store = session_store
         self.faiss_store = faiss_store
         self.bm25_store = bm25_store
         self.cache = cache
         self.llm_generator = llm_generator
         self.context_resolver = BanglaContextResolver(session_store)
+        self.deterministic_responder = DeterministicResponder(products)
         # Embedder is injected from main.py startup so it is NEVER loaded
         # inside the request hot path (eliminates the 10s cold-load latency)
         self._embedder = embedder
@@ -109,8 +121,76 @@ class RAGPipeline:
             resolved_query = resolved.rewritten
             coref_resolved = resolved.coref_resolved
             normalized_query = self._normalize_query(resolved_query)
+            last_context = await self.session_store.get_last_context(session_id)
 
-            # ── Stage 2: Embedding (needed for semantic cache + retrieval) ────
+            # ── Stage 2: Exact deterministic fast path ────────────────────────
+            t0 = time.perf_counter()
+            exact_answer = self.deterministic_responder.fast_path_answer(
+                resolved_query,
+                prior_context=last_context,
+            )
+            latencies["exact_lookup_ms"] = round((time.perf_counter() - t0) * 1000, 1)
+
+            if exact_answer:
+                latencies["embed_ms"] = 0.0
+                latencies["cache_ms"] = 0.0
+                latencies["retrieval_ms"] = 0.0
+                latencies["fusion_ms"] = 0.0
+                latencies["template_ms"] = latencies["exact_lookup_ms"]
+                latencies["llm_ms"] = 0.0
+                latencies["total_ms"] = round((time.perf_counter() - t0_total) * 1000, 1)
+
+                asyncio.create_task(
+                    self.cache.set(
+                        normalized_query,
+                        {
+                            "response": exact_answer.response,
+                            "retrieved_docs": exact_answer.products,
+                            "target_context": exact_answer.target_context,
+                        },
+                    )
+                )
+                asyncio.create_task(
+                    self.session_store.append_to_history(
+                        session_id,
+                        {
+                            "original_query": query,
+                            "resolved_query": resolved_query,
+                            "coref_resolved": coref_resolved,
+                            "cache_hit": False,
+                            "answer_mode": "template_exact",
+                            "intent": exact_answer.intent,
+                        },
+                    )
+                )
+                if exact_answer.target_context:
+                    asyncio.create_task(
+                        self.session_store.set_last_context(session_id, exact_answer.target_context)
+                    )
+
+                metrics.record("template_answer", latencies["template_ms"], success=True)
+                metrics.record("pipeline_e2e", latencies["total_ms"], success=True)
+                logger.info(
+                    "Exact template response generated",
+                    extra={
+                        "request_id": request_id,
+                        "session_id": session_id,
+                        "intent": exact_answer.intent,
+                        "total_ms": latencies["total_ms"],
+                    },
+                )
+                return RAGResponse(
+                    query=query,
+                    response=exact_answer.response,
+                    retrieved_docs=exact_answer.products,
+                    session_id=session_id,
+                    latencies=latencies,
+                    coref_resolved=coref_resolved,
+                    cache_hit=False,
+                    request_id=request_id,
+                )
+
+            # ── Stage 3: Embedding (needed for semantic cache + retrieval) ────
             # Use the pre-warmed singleton injected at startup.
             # NEVER call get_embedder() here — it would reload the model.
             t0 = time.perf_counter()
@@ -118,7 +198,7 @@ class RAGPipeline:
             query_vector = await embedder.embed(normalized_query)
             latencies["embed_ms"] = round((time.perf_counter() - t0) * 1000, 1)
 
-            # ── Stage 3: Semantic Cache Lookup ───────────────────────────────
+            # ── Stage 4: Semantic Cache Lookup ───────────────────────────────
             # Pass the pre-computed embedding so cache doesn't re-embed
             t0 = time.perf_counter()
             cached_payload = await self.cache.get(normalized_query, query_embedding=query_vector)
@@ -146,6 +226,13 @@ class RAGPipeline:
                         },
                     )
                 )
+                if isinstance(cached_payload, dict) and cached_payload.get("target_context"):
+                    asyncio.create_task(
+                        self.session_store.set_last_context(
+                            session_id,
+                            cached_payload["target_context"],
+                        )
+                    )
                 return RAGResponse(
                     query=query,
                     response=cached_payload["response"],
@@ -157,7 +244,7 @@ class RAGPipeline:
                     request_id=request_id,
                 )
 
-            # ── Stage 4: Parallel FAISS + BM25 Retrieval ─────────────────────
+            # ── Stage 5: Parallel FAISS + BM25 Retrieval ─────────────────────
             # Both use the already-computed embedding — no extra embed call
             t0 = time.perf_counter()
             faiss_results, bm25_results = await asyncio.gather(
@@ -166,20 +253,83 @@ class RAGPipeline:
             )
             latencies["retrieval_ms"] = round((time.perf_counter() - t0) * 1000, 1)
 
-            # ── Stage 5: RRF Fusion ───────────────────────────────────────────
+            # ── Stage 6: RRF Fusion ───────────────────────────────────────────
             t0 = time.perf_counter()
             fused = reciprocal_rank_fusion(faiss_results, bm25_results, k=60)
             retrieved_docs = fused[:3]
             latencies["fusion_ms"] = round((time.perf_counter() - t0) * 1000, 1)
 
-            # ── Stage 6: Prompt Build ─────────────────────────────────────────
+            # ── Stage 7: Deterministic routing ────────────────────────────────
+            t0 = time.perf_counter()
+            deterministic = self.deterministic_responder.maybe_answer(
+                resolved_query,
+                retrieved_docs,
+            )
+            latencies["template_ms"] = round((time.perf_counter() - t0) * 1000, 1)
+
+            if deterministic:
+                latencies["llm_ms"] = 0.0
+                latencies["total_ms"] = round((time.perf_counter() - t0_total) * 1000, 1)
+
+                asyncio.create_task(
+                    self.cache.set(
+                        normalized_query,
+                        {
+                            "response": deterministic.response,
+                            "retrieved_docs": deterministic.products,
+                            "target_context": deterministic.target_context,
+                        },
+                        query_embedding=query_vector,
+                    )
+                )
+                asyncio.create_task(
+                    self.session_store.append_to_history(
+                        session_id,
+                        {
+                            "original_query": query,
+                            "resolved_query": resolved_query,
+                            "coref_resolved": coref_resolved,
+                            "cache_hit": False,
+                            "answer_mode": "template",
+                            "intent": deterministic.intent,
+                        },
+                    )
+                )
+                if deterministic.target_context:
+                    asyncio.create_task(
+                        self.session_store.set_last_context(session_id, deterministic.target_context)
+                    )
+
+                metrics.record("template_answer", latencies["template_ms"], success=True)
+                metrics.record("pipeline_e2e", latencies["total_ms"], success=True)
+                logger.info(
+                    "Template response generated",
+                    extra={
+                        "request_id": request_id,
+                        "session_id": session_id,
+                        "intent": deterministic.intent,
+                        "total_ms": latencies["total_ms"],
+                    },
+                )
+                return RAGResponse(
+                    query=query,
+                    response=deterministic.response,
+                    retrieved_docs=deterministic.products,
+                    session_id=session_id,
+                    latencies=latencies,
+                    coref_resolved=coref_resolved,
+                    cache_hit=False,
+                    request_id=request_id,
+                )
+
+            # ── Stage 8: Prompt Build ─────────────────────────────────────────
             t0 = time.perf_counter()
             system_prompt, user_prompt = PromptBuilder.build_full_prompt(
                 resolved_query, retrieved_docs
             )
             latencies["prompt_ms"] = round((time.perf_counter() - t0) * 1000, 1)
 
-            # ── Stage 7: LLM Generation (primary → fallback) ──────────────────
+            # ── Stage 9: LLM Generation (primary → fallback) ──────────────────
             t0 = time.perf_counter()
             llm_response = await self.llm_generator.generate(system_prompt, user_prompt)
             latencies["llm_ms"] = round((time.perf_counter() - t0) * 1000, 1)
@@ -203,6 +353,7 @@ class RAGPipeline:
                         "resolved_query": resolved_query,
                         "coref_resolved": coref_resolved,
                         "cache_hit": False,
+                        "answer_mode": "llm",
                     },
                 )
             )

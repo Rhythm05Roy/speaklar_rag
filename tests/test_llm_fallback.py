@@ -117,6 +117,6 @@ async def test_pipeline_returns_fallback_on_llm_failure(monkeypatch):
         llm_generator=llm,
     )
 
-    result = await pipeline.process_query("fail-test", "নুডুলসের দাম কত?")
+    result = await pipeline.process_query("fail-test", "চাল সম্পর্কে বলো")
     assert result.response == _FALLBACK_RESPONSE
     assert len(result.response) > 0

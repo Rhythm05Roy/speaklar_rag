@@ -32,6 +32,7 @@ from api.pipeline import RAGPipeline
 from api.middleware import RateLimitMiddleware
 from utils.logger import logger
 from utils.metrics import metrics, prometheus_metrics_text
+from utils.product_metadata import enrich_product
 from data.generate_mock_data import MOCK_PRODUCTS
 
 
@@ -102,11 +103,12 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("FAISS index not found — building from mock data...")
         import numpy as np
-        texts = [f"{p['name']} {p['description']}" for p in MOCK_PRODUCTS]
+        enriched_products = [enrich_product(product) for product in MOCK_PRODUCTS]
+        texts = [f"{p['name']} {p['description']}" for p in enriched_products]
         vectors = await embedder.embed(texts)
         if vectors.ndim == 1:
             vectors = vectors.reshape(1, -1)
-        await _faiss_store.build_index(vectors, MOCK_PRODUCTS)
+        await _faiss_store.build_index(vectors, enriched_products)
         await _faiss_store.save(str(settings.index_path))
 
     # ── BM25 index ────────────────────────────────────────────────────────────
@@ -116,7 +118,7 @@ async def lifespan(app: FastAPI):
         await _bm25_store.load(str(settings.index_path))
     else:
         logger.info("BM25 index not found — building from mock data...")
-        await _bm25_store.build_index(MOCK_PRODUCTS)
+        await _bm25_store.build_index([enrich_product(product) for product in MOCK_PRODUCTS])
         await _bm25_store.save(str(settings.index_path))
 
     # ── Semantic cache ────────────────────────────────────────────────────────

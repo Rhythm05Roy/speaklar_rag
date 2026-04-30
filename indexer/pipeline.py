@@ -25,6 +25,7 @@ from retrieval.embedder import get_embedder
 from retrieval.faiss_store import FAISSStore
 from retrieval.bm25_store import BM25Store
 from utils.logger import logger
+from utils.product_metadata import enrich_product
 from config import settings
 
 
@@ -106,7 +107,7 @@ class IndexingPipeline:
             logger.info(f"Loaded {len(products)} raw products")
 
             # ── Stage 2: Normalize + deduplicate ────────────────────────────
-            products = [normalize_product(p) for p in products]
+            products = [enrich_product(normalize_product(p)) for p in products]
             products = deduplicate_products(products)
             stats["indexed_count"] = len(products)
             logger.info(f"After normalization + dedup: {len(products)} products")
