@@ -27,8 +27,6 @@ services:
 
   # ── FastAPI RAG Service ───────────────────────────────────────────────────────
   api:
-    # In production: use pre-built image from GHCR (set API_IMAGE in .env)
-    # In development: build locally
     image: ${API_IMAGE:-speaklar-rag:local}
     build:
       context: .
@@ -37,12 +35,11 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - .env
+      - .env                          # ← GROQ_API_KEY, OPENAI_API_KEY etc.
     environment:
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-}@redis:6379/0
+      - REDIS_URL=redis://redis:6379/0
     volumes:
-      # Persist FAISS + BM25 indexes and product data across deploys
-      - ./data:/app/data
+      - ./data:/app/data              # ← mounts pre-built indexes, avoids rebuild
     depends_on:
       redis:
         condition: service_healthy
@@ -55,11 +52,6 @@ services:
     networks:
       - speaklar-net
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 2G    # ONNX model + FAISS index ~600MB
-          cpus: '2.0'
 
   # ── Prometheus ───────────────────────────────────────────────────────────────
   prometheus:

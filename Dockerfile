@@ -2,27 +2,31 @@
 FROM python:3.11-slim AS builder
 
 WORKDIR /build
-ENV PYTHONPATH=/install/lib/python3.11/site-packages
 
-# System deps for faiss-cpu, sentence-transformers, and ONNX runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
+    build-essential curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+# Create venv so runtime stage can copy it cleanly
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Pre-download + export embedding model to ONNX (baked into image — no cold start)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Pre-bake ONNX model using the EXACT same code path as embedder.py
+# This populates ~/.cache/huggingface with the exported ONNX artifacts.
+# Without this, every container startup exports from scratch (~70s).
 RUN python -c "\
-from optimum.onnxruntime import ORTModelForFeatureExtraction; \
-from transformers import AutoTokenizer; \
-model = ORTModelForFeatureExtraction.from_pretrained( \
-    'intfloat/multilingual-e5-small', export=True); \
-model.save_pretrained('/build/onnx_model'); \
-AutoTokenizer.from_pretrained('intfloat/multilingual-e5-small') \
-    .save_pretrained('/build/onnx_model'); \
-print('ONNX model exported')"
+import os; \
+os.environ['TRANSFORMERS_CACHE'] = '/opt/hf-cache'; \
+os.environ['HF_HOME'] = '/opt/hf-cache'; \
+from sentence_transformers import SentenceTransformer; \
+model = SentenceTransformer('intfloat/multilingual-e5-small', backend='onnx', \
+    model_kwargs={'cache_folder': '/opt/hf-cache'}); \
+model.max_seq_length = 64; \
+_ = model.encode('warmup', convert_to_numpy=True); \
+print('ONNX model pre-baked successfully')"
 
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
@@ -30,38 +34,37 @@ FROM python:3.11-slim AS runtime
 
 WORKDIR /app
 
-# Runtime system deps (curl for healthcheck only)
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy installed Python packages
-COPY --from=builder /install /usr/local
+# Copy venv and pre-baked model cache from builder
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /opt/hf-cache /opt/hf-cache
 
-# Copy pre-built ONNX model (eliminates 20s cold-export on startup)
-COPY --from=builder /build/onnx_model /app/onnx_model
+# Point HuggingFace to the baked-in cache
+ENV PATH="/opt/venv/bin:$PATH" \
+    HF_HOME="/opt/hf-cache" \
+    TRANSFORMERS_CACHE="/opt/hf-cache" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
 
-# Also copy HuggingFace cache (tokenizer files)
-COPY --from=builder /root/.cache /root/.cache
-
-# Non-root user for security
+# Non-root user
 RUN groupadd -r speaklar && useradd -r -g speaklar speaklar \
-    && chown -R speaklar:speaklar /app
+    && chown -R speaklar:speaklar /app /opt/hf-cache
 
-# Copy application source
+# Copy source code
 COPY --chown=speaklar:speaklar . .
 
-# Data and index directories (will be mounted as volumes in production)
+# Ensure data/indexes dir exists (will be overridden by volume mount)
 RUN mkdir -p /app/data/indexes && chown -R speaklar:speaklar /app/data
 
 USER speaklar
 
 EXPOSE 8000
 
-# Health-check via /readiness endpoint
 HEALTHCHECK --interval=15s --timeout=5s --start-period=60s --retries=3 \
     CMD curl -sf http://localhost:8000/readiness || exit 1
 
-# uvloop for maximum async throughput
 ENTRYPOINT ["uvicorn", "api.main:app", \
     "--host", "0.0.0.0", \
     "--port", "8000", \

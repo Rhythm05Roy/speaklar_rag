@@ -13,10 +13,10 @@ redis[asyncio]>=5.0.3
 faiss-cpu>=1.8.0
 numpy>=1.26.0
 
-# Embedding model
-sentence-transformers>=2.7.0
+# Embedding model — optimum pinned: >=1.23 renames main_export breaking ONNX backend
+sentence-transformers>=3.0.0
 torch>=2.2.0
-optimum[onnxruntime]>=1.19.0
+optimum[onnxruntime]>=1.19.0,<1.23.0
 
 # BM25 lexical search
 rank-bm25>=0.2.2
